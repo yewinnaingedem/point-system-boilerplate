@@ -1,0 +1,7 @@
+{
+    "Access": true,
+    "AppSetting": true,
+    "Dashboard": true,
+    "LogViewer": true,
+    "Api": true
+}

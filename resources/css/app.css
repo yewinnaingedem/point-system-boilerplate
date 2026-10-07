@@ -1,0 +1,94 @@
+@import '@fortawesome/fontawesome-free/css/all.min.css';
+@import 'admin-lte/dist/css/adminlte.min.css';
+
+/*
+ * Brand colour. --brand is set from the "Primary color" setting in partials/head.
+ * AdminLTE ships a fixed blue primary, so the pieces that use it are re-pointed here.
+ */
+:root {
+    --brand: #007bff;
+}
+
+/* Plain content links only; AdminLTE styles its own nav, buttons and box footers. */
+.content-wrapper a:not(.btn):not(.nav-link):not(.dropdown-item):not(.page-link):not(.small-box-footer):not(.badge),
+.login-page a:not(.btn) {
+    color: var(--brand);
+}
+.text-primary {
+    color: var(--brand) !important;
+}
+
+.bg-primary,
+.badge-primary,
+.btn-primary,
+.btn-primary:not(:disabled):not(.disabled):active,
+.btn-primary:not(:disabled):not(.disabled).active,
+.page-item.active .page-link,
+.content-wrapper .nav-pills .nav-link.active,
+.content-wrapper .nav-pills .show > .nav-link,
+.sidebar-dark-primary .nav-sidebar > .nav-item > .nav-link.active,
+.card-primary:not(.card-outline) > .card-header,
+.custom-control-input:checked ~ .custom-control-label::before,
+.progress-bar {
+    background-color: var(--brand) !important;
+    border-color: var(--brand) !important;
+    color: #fff !important;
+}
+.btn-primary:hover,
+.btn-primary:focus {
+    filter: brightness(0.92);
+}
+.card-primary.card-outline,
+.card-primary.card-outline-tabs > .card-header a.active {
+    border-top-color: var(--brand) !important;
+}
+.form-control:focus,
+.custom-select:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--brand) 25%, transparent);
+}
+.login-page .login-logo i,
+.brand-mark {
+    color: var(--brand);
+}
+
+/* Small additions on top of AdminLTE. */
+.avatar-initials {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--brand) 15%, transparent);
+    color: var(--brand);
+    font-weight: 700;
+}
+.table td,
+.table th {
+    vertical-align: middle;
+}
+.brand-link .brand-image-initial {
+    float: left;
+    width: 33px;
+    height: 33px;
+    margin-left: 0.8rem;
+    margin-right: 0.5rem;
+    margin-top: -3px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--brand);
+    color: #fff;
+}
+.small-box .icon > i {
+    font-size: 70px;
+}
+.settings-color {
+    width: 3rem;
+    padding: 0.15rem;
+}
+.login-box,
+.register-box {
+    width: 380px;
+    max-width: calc(100% - 32px);
+}
