@@ -160,9 +160,7 @@ Send `Authorization: Bearer <token>`. Errors are always JSON (401 no/expired/rev
 | Service | What | Host port |
 |---|---|---|
 | `web` | nginx → `public/` | **8080** (`APP_PORT`) |
-| `app` | PHP 8.4-FPM (`docker/php/Dockerfile`), the project is bind-mounted | — |
-| `queue` | `queue:work redis` | — |
-| `scheduler` | `schedule:work` (e.g. `sanctum:prune-expired`) | — |
+| `app` | PHP 8.4-FPM (`docker/php/Dockerfile`), runs as your host uid, the project is bind-mounted | — |
 | `mysql` | MySQL 8.4, db `pos_system`, volume `mysql-data` | **3308** (`FORWARD_DB_PORT`) |
 | `redis` | Redis 7 (cache + queue), volume `redis-data` | **6380** (`FORWARD_REDIS_PORT`) |
 
@@ -182,7 +180,8 @@ docker compose exec app php artisan storage:link
 - Redis client is **predis** (`REDIS_CLIENT=predis`): pure PHP, works without the `redis` extension.
   Only `phpredis` or `predis` are valid values.
 - Sessions stay in the database (`SESSION_DRIVER=database`), because the user screen lists and clears them.
-- After changing queued code: `docker compose restart queue`.
+- No queue worker or scheduler container (local dev). When a feature needs them, run
+  `docker compose exec app php artisan queue:work` / `schedule:work`, or add the services back.
 - Default sign-in: `admin@pos.test` / `password`. Change it after first sign-in.
 
 **Data moved from SQLite (2026-10-07).** The app first ran on `database/database.sqlite`. Its data was
