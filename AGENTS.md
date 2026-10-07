@@ -11,7 +11,7 @@ features yet**: sales, products, inventory etc. are to be built as new modules.
 - **Laravel 12**, **PHP 8.2+** (developed on 8.4). Admin UI is **AdminLTE 3.2** (Bootstrap 4.6, jQuery 3,
   Font Awesome 5), bundled with Vite. No Tailwind: its reset breaks Bootstrap.
 - `nwidart/laravel-modules` v12 for modules, `spatie/laravel-permission` v6 for roles/permissions.
-- Local default DB is SQLite (`database/database.sqlite`); set `DB_*` for MySQL.
+- DB is MySQL (Docker, see "Running it"); tests use in-memory SQLite.
 
 ## Layout
 
@@ -153,31 +153,43 @@ Send `Authorization: Bearer <token>`. Errors are always JSON (401 no/expired/rev
 - Testing tip: in feature tests call `$this->app['auth']->forgetGuards()` between requests with
   different tokens; Sanctum's guard caches the user inside one test (real requests don't).
 
-## Running it (local PHP + Docker for MySQL/Redis)
+## Running it (Docker)
 
-PHP 8.4 and Node run on your machine; `compose.yaml` only runs **MySQL 8.4** (host port **3308**,
-db `pos_system`, volume `mysql-data`) and **Redis 7** (**6380**, cache + queue). Ports avoid the
-cargo project's containers (3307 / 6379).
+`compose.yaml` runs the whole stack; ports avoid the cargo project's containers (3307 / 6379).
+
+| Service | What | Host port |
+|---|---|---|
+| `web` | nginx → `public/` | **8080** (`APP_PORT`) |
+| `app` | PHP 8.4-FPM (`docker/php/Dockerfile`), the project is bind-mounted | — |
+| `queue` | `queue:work redis` | — |
+| `scheduler` | `schedule:work` (e.g. `sanctum:prune-expired`) | — |
+| `mysql` | MySQL 8.4, db `pos_system`, volume `mysql-data` | **3308** (`FORWARD_DB_PORT`) |
+| `redis` | Redis 7 (cache + queue), volume `redis-data` | **6380** (`FORWARD_REDIS_PORT`) |
 
 ```bash
-cp .env.example .env     # set DB_PASSWORD / DB_ROOT_PASSWORD (compose reads them too)
-docker compose up -d     # first start: give MySQL ~20 s before the next step
-composer setup           # install, key, migrate --seed, storage:link, npm build
-composer dev             # http://localhost:8000 + queue:listen, pail logs, vite
+cp .env.example .env               # set DB_PASSWORD / DB_ROOT_PASSWORD, DOCKER_UID/GID = `id -u` / `id -g`
+composer install && npm install && npm run build
+docker compose up -d --build       # http://localhost:8080
+docker compose exec app php artisan key:generate
+docker compose exec app php artisan migrate --seed
+docker compose exec app php artisan storage:link
 ```
 
+- `.env` holds the **host** view (`DB_HOST=127.0.0.1`, `DB_PORT=3308`, `REDIS_PORT=6380`); compose
+  overrides them inside the containers (`mysql:3306`, `redis:6379`). So `php artisan …` works both on
+  the host (PHP 8.4) and via `docker compose exec app php artisan …`. **Don't `config:cache` in
+  development**: it would freeze one set of hosts for both.
 - Redis client is **predis** (`REDIS_CLIENT=predis`): pure PHP, works without the `redis` extension.
   Only `phpredis` or `predis` are valid values.
 - Sessions stay in the database (`SESSION_DRIVER=database`), because the user screen lists and clears them.
-- No scheduler runs locally (it only does `sanctum:prune-expired`); use `php artisan schedule:work` if needed.
+- After changing queued code: `docker compose restart queue`.
 - Default sign-in: `admin@pos.test` / `password`. Change it after first sign-in.
 
 **Data moved from SQLite (2026-10-07).** The app first ran on `database/database.sqlite`. Its data was
 copied into MySQL with `php artisan db:import-sqlite` (migrate the target first; copies every table
-except framework scratch tables, keeps ids, one transaction, replaces target rows). Exports live in
-`database/exports/` (git-ignored: they contain password hashes):
-`pos_system_sqlite_*.sqlite` / `.sql` (before) and `pos_system_mysql_*.sql` (after). Restore a MySQL
-export with `docker compose exec -T mysql mysql -u pos_user -p pos_system < database/exports/<file>.sql`.
+except framework scratch tables, keeps ids, one transaction, replaces target rows). The SQLite file and its exports were
+then deleted; only MySQL backups `pos_system_mysql_*.sql` are kept in `database/exports/` (git-ignored:
+they contain password hashes). Restore one with `docker compose exec -T mysql mysql -u pos_user -p pos_system < database/exports/<file>.sql`.
 
 ## Testing
 
