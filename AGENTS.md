@@ -153,35 +153,23 @@ Send `Authorization: Bearer <token>`. Errors are always JSON (401 no/expired/rev
 - Testing tip: in feature tests call `$this->app['auth']->forgetGuards()` between requests with
   different tokens; Sanctum's guard caches the user inside one test (real requests don't).
 
-## Running it (Docker)
+## Running it (local PHP + Docker for MySQL/Redis)
 
-`compose.yaml` runs the whole stack; ports avoid the cargo project's containers (3307 / 6379).
-
-| Service | What | Host port |
-|---|---|---|
-| `web` | nginx → `public/` | **8080** (`APP_PORT`) |
-| `app` | PHP 8.4-FPM (`docker/php/Dockerfile`), runs as your host uid, the project is bind-mounted | — |
-| `mysql` | MySQL 8.4, db `pos_system`, volume `mysql-data` | **3308** (`FORWARD_DB_PORT`) |
-| `redis` | Redis 7 (cache + queue), volume `redis-data` | **6380** (`FORWARD_REDIS_PORT`) |
+PHP 8.4 and Node run on your machine; `compose.yaml` only runs **MySQL 8.4** (host port **3308**,
+db `pos_system`, volume `mysql-data`) and **Redis 7** (**6380**, cache + queue). Ports avoid the
+cargo project's containers (3307 / 6379).
 
 ```bash
-cp .env.example .env               # set DB_PASSWORD / DB_ROOT_PASSWORD, DOCKER_UID/GID = `id -u` / `id -g`
-composer install && npm install && npm run build
-docker compose up -d --build       # http://localhost:8080
-docker compose exec app php artisan key:generate
-docker compose exec app php artisan migrate --seed
-docker compose exec app php artisan storage:link
+cp .env.example .env     # set DB_PASSWORD / DB_ROOT_PASSWORD (compose reads them too)
+docker compose up -d     # first start: give MySQL ~20 s before the next step
+composer setup           # install, key, migrate --seed, storage:link, npm build
+composer dev             # http://localhost:8000 + queue:listen, pail logs, vite
 ```
 
-- `.env` holds the **host** view (`DB_HOST=127.0.0.1`, `DB_PORT=3308`, `REDIS_PORT=6380`); compose
-  overrides them inside the containers (`mysql:3306`, `redis:6379`). So `php artisan …` works both on
-  the host (PHP 8.4) and via `docker compose exec app php artisan …`. **Don't `config:cache` in
-  development**: it would freeze one set of hosts for both.
 - Redis client is **predis** (`REDIS_CLIENT=predis`): pure PHP, works without the `redis` extension.
   Only `phpredis` or `predis` are valid values.
 - Sessions stay in the database (`SESSION_DRIVER=database`), because the user screen lists and clears them.
-- No queue worker or scheduler container (local dev). When a feature needs them, run
-  `docker compose exec app php artisan queue:work` / `schedule:work`, or add the services back.
+- No scheduler runs locally (it only does `sanctum:prune-expired`); use `php artisan schedule:work` if needed.
 - Default sign-in: `admin@pos.test` / `password`. Change it after first sign-in.
 
 **Data moved from SQLite (2026-10-07).** The app first ran on `database/database.sqlite`. Its data was

@@ -25,20 +25,20 @@ file is the detail and the history.
 | 9. Menu groups | `MenuGroup` treeview; Users/Roles/Permissions under **Access Management** | user request, AdminLTE style |
 | 10. Daily logs | `LOG_STACK=daily`, viewer lists only `laravel-YYYY-MM-DD.log` | match cargo (30 days) |
 | 11. User features | Login as, view page, change password, clear sessions, Deactivated/Deleted tabs, soft delete + restore | parity with the cargo boilerplate (skipped: email confirmation, social unlink, agent upgrade — not used in POS) |
-| 12. Docker + MySQL | `compose.yaml` (app, web:8080, queue, scheduler, mysql:3308, redis:6380); SQLite data moved with `db:import-sqlite` | run like production, next to the cargo containers |
+| 12. Docker + MySQL | `compose.yaml` runs only mysql:3308 + redis:6380; PHP/Node run on the host. SQLite data moved with `db:import-sqlite` | local dev with no PHP image to build; ports sit next to the cargo containers |
 
 ## Running and checking
 
-Docker (preferred): `docker compose up -d --build`, app at http://localhost:8080,
-`docker compose exec app php artisan …`. Details and ports: AGENTS.md "Running it (Docker)".
+`docker compose up -d` (MySQL + Redis), then `composer dev`: app at http://localhost:8000.
+First run: `composer setup`. Details: AGENTS.md "Running it".
 
-On the host, `php` is 7.4 — use 8.4 explicitly (it reaches the Docker MySQL/Redis through `.env`):
+The host `php` is Homebrew PHP 8.4 and reaches the Docker MySQL/Redis through `.env`:
 
 ```bash
-P=/opt/homebrew/opt/php@8.4/bin/php
+P=php
 $P artisan test                           # tests/ + Modules/*/tests, in-memory SQLite (70 tests)
 $P vendor/bin/pint                        # style
-$P /usr/local/bin/composer require ...    # composer must run under 8.4 too
+composer require ...                       # Homebrew composer, PHP 8.4
 npm run build                             # after any CSS/JS or new Blade classes
 $P artisan module:seed <Module>           # after adding permissions (idempotent)
 ```
