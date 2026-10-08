@@ -13,7 +13,7 @@
                 <div class="card-header">
                     <h3 class="card-title">{{ __('Levels') }}</h3>
                 </div>
-                <div class="card-body p-0">
+                <div class="card-body ">
                     <ul class="nav nav-pills flex-column">
                         <li class="nav-item">
                             <a href="{{ route('admin.logs.show', ['file' => $file->name, 'search' => request('search')]) }}" @class(['nav-link', 'active' => $level === null])>

@@ -33,11 +33,21 @@ export function initForms() {
         }
     });
 
+    // Picking a date in a period filter switches its period select to "custom":
+    // <input type="date" data-period-custom="#period-select">.
+    $(document).on('change', '[data-period-custom]', function () {
+        $($(this).data('period-custom')).val('custom').trigger('change');
+    });
+
+    // Ask before submitting: <form data-confirm="Are you sure?">.
+    $(document).on('submit', 'form[data-confirm]', function (event) {
+        if (!window.confirm(this.dataset.confirm)) {
+            event.preventDefault();
+        }
+    });
+
     // Submit filter forms when a select changes: <select data-autosubmit>.
     $(document).on('change', '[data-autosubmit]', function () {
         this.form.submit();
     });
-
-    // Success alerts fade out on their own.
-    setTimeout(() => $('.alert-success.alert-dismissible').alert('close'), 5000);
 }

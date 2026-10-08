@@ -4,49 +4,43 @@ namespace Modules\Access\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 use Modules\Access\Http\Requests\UserRequest;
+use Modules\Access\Http\Requests\UserTableRequest;
 use Modules\Access\Services\UserService;
 use Modules\Access\Services\UserSessionService;
 use Modules\Access\Support\PermissionMatrix;
+use Modules\Access\Tables\UsersTable;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
-    /** Tabs on the users list. "deleted" lists soft-deleted users (needs delete-user). */
-    private const STATUSES = ['active', 'inactive', 'deleted'];
-
     public function __construct(private readonly UserService $users) {}
 
+    /**
+     * The page: tabs, filters and an empty table; rows come from data() via DataTables.
+     * search / role / status in the URL pre-fill the filters, so filtered links still work.
+     */
     public function index(Request $request): View
     {
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:100'],
             'role' => ['nullable', 'string', 'exists:roles,name'],
-            'status' => ['nullable', 'in:'.implode(',', self::STATUSES)],
+            'status' => ['nullable', 'in:'.implode(',', UserTableRequest::STATUSES)],
         ]);
         $status = $filters['status'] ?? null;
 
         abort_if($status === 'deleted' && ! $request->user()->can('delete-user'), 403);
 
-        $users = User::query()
-            ->with('roles:id,name')
-            ->search($filters['search'] ?? null)
-            ->when($filters['role'] ?? null, fn ($q, string $role) => $q->role($role))
-            ->when($status === 'active', fn ($q) => $q->where('is_active', true))
-            ->when($status === 'inactive', fn ($q) => $q->where('is_active', false))
-            ->when($status === 'deleted', fn ($q) => $q->onlyTrashed())
-            ->latest('id')
-            ->paginate(config('access.users_per_page'))
-            ->withQueryString();
-
         return view('access::users.index', [
-            'users' => $users,
             'status' => $status,
+            'search' => $filters['search'] ?? null,
+            'role' => $filters['role'] ?? null,
             'tabCounts' => [
                 'all' => User::count(),
                 'active' => User::where('is_active', true)->count(),
@@ -55,6 +49,12 @@ class UserController extends Controller
             ],
             'roles' => Role::orderBy('name')->pluck('name'),
         ]);
+    }
+
+    /** JSON rows for the users table (server-side DataTables). */
+    public function data(UserTableRequest $request, UsersTable $table): JsonResponse
+    {
+        return $table->response($request);
     }
 
     public function show(User $user, UserSessionService $sessions, PermissionMatrix $matrix): View

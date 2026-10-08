@@ -87,6 +87,7 @@ class ApiServiceProvider extends ModuleServiceProvider
             ->by(Str::lower((string) $request->input('login')).'|'.$request->ip()));
 
         RateLimiter::for('api', fn (Request $request) => Limit::perMinute(config('api.rate_per_minute'))
-            ->by($request->user()?->id ?: $request->ip()));
+            // Staff users and customers have separate id sequences: key by type + id.
+            ->by($request->user() ? class_basename($request->user()).':'.$request->user()->getKey() : $request->ip()));
     }
 }

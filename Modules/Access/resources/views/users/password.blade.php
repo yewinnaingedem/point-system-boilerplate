@@ -1,6 +1,6 @@
 <x-layouts.admin :title="__('Change password')" :breadcrumbs="[__('Users') => route('admin.access.users.index'), $user->name => route('admin.access.users.show', $user)]">
-    <div class="row">
-        <div class="col-lg-6">
+    <div class="">
+        <div class="">
             <form method="POST" action="{{ route('admin.access.users.password.update', $user) }}" class="card card-warning card-outline">
                 @csrf
                 @method('PUT')

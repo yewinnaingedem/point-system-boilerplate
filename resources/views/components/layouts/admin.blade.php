@@ -11,6 +11,7 @@
 </head>
 <body class="hold-transition sidebar-mini layout-fixed layout-navbar-fixed">
 @include('partials.dark-mode-init')
+@include('partials.sidebar-state-init')
 <div class="wrapper">
     @include('partials.navbar')
     @include('partials.sidebar')
@@ -52,11 +53,12 @@
                         </form>
                     </div>
                 @endif
-                @include('partials.flash')
                 {{ $slot }}
             </div>
         </section>
     </div>
+    @include('partials.ui-state-restore')
+    @include('partials.toasts')
 
     <footer class="main-footer">
         <strong>&copy; {{ date('Y') }} {{ setting('company_name') }}.</strong> {{ __('All rights reserved.') }}

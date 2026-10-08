@@ -11,6 +11,7 @@ use Modules\Access\Http\Controllers\UserSessionController;
 
 Route::middleware('admin')->prefix('admin/access')->name('admin.access.')->group(function () {
     Route::get('users', [UserController::class, 'index'])->middleware('permission:view-user')->name('users.index');
+    Route::get('users/data', [UserController::class, 'data'])->middleware('permission:view-user')->name('users.data');
     Route::get('users/create', [UserController::class, 'create'])->middleware('permission:create-user')->name('users.create');
     Route::post('users', [UserController::class, 'store'])->middleware('permission:create-user')->name('users.store');
     Route::get('users/{user}', [UserController::class, 'show'])->middleware('permission:view-user')->name('users.show');

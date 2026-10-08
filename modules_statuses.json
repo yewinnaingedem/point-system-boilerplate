@@ -3,5 +3,10 @@
     "AppSetting": true,
     "Dashboard": true,
     "LogViewer": true,
-    "Api": true
+    "Api": true,
+    "Loyalty": true,
+    "Merchant": true,
+    "Customer": true,
+    "Partner": true,
+    "GiftCard": true
 }

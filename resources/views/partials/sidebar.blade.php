@@ -3,7 +3,7 @@
 <aside class="main-sidebar sidebar-dark-primary elevation-4">
     <a href="{{ route('admin.dashboard') }}" class="brand-link">
         @if ($logo = setting()->url('logo'))
-            <img src="{{ $logo }}" alt="{{ setting('app_name') }}" class="brand-image img-circle elevation-3" style="opacity: .9">
+            <img src="{{ $logo }}" alt="{{ setting('app_name') }}" class="brand-image img-circle elevation-3" style="opacity: .9 ; width: 30px ; height: 30px ;" >
         @else
             <span class="brand-image-initial elevation-3"><i class="fas fa-cash-register"></i></span>
         @endif
@@ -30,15 +30,18 @@
         </div>
 
         <nav class="mt-2">
-            <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
-                @foreach ($menuSections as $section => $items)
+            {{-- One list per section, so each can carry its own divider (.nav-sidebar-section in app.css).
+                 Each list needs its own id: AdminLTE's treeview binds its click handler to "#id .nav-link", and
+                 without an id every list handles every click, toggling a group several times (it never closes). --}}
+            @foreach ($menuSections as $section => $items)
+                <ul id="sidebar-section-{{ $loop->index }}" class="nav nav-pills nav-sidebar nav-sidebar-section flex-column" data-widget="treeview" role="menu" data-accordion="false">
                     @unless ($loop->first && $section === 'Main')
                         <li class="nav-header">{{ mb_strtoupper(__($section)) }}</li>
                     @endunless
                     @foreach ($items as $entry)
                         @if ($entry instanceof \App\Support\Menu\MenuGroup)
                             @php($open = $entry->isActive())
-                            <li @class(['nav-item', 'menu-open' => $open])>
+                            <li @class(['nav-item', 'menu-open' => $open]) data-menu-group="{{ $entry->key }}">
                                 <a href="#" @class(['nav-link', 'active' => $open])>
                                     <i class="nav-icon {{ $entry->icon }}"></i>
                                     <p>{{ __($entry->label) }} <i class="right fas fa-angle-left"></i></p>
@@ -53,8 +56,8 @@
                             @include('partials.sidebar-link', ['item' => $entry, 'child' => false])
                         @endif
                     @endforeach
-                @endforeach
-            </ul>
+                </ul>
+            @endforeach
         </nav>
     </div>
 </aside>

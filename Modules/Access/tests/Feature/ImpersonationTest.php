@@ -83,10 +83,11 @@ class ImpersonationTest extends TestCase
     {
         $inactive = $this->userWithRole(SystemRole::Cashier, ['is_active' => false]);
 
-        $this->actingAs($this->admin)->get('/admin/access/users')
-            ->assertSee(route('admin.access.users.impersonate', $this->cashier))
-            ->assertDontSee(route('admin.access.users.impersonate', $this->admin))
-            ->assertDontSee(route('admin.access.users.impersonate', $inactive));
+        $rows = $this->dataTableText($this->actingAs($this->admin)->dataTable(route('admin.access.users.data'), ['id', 'user', 'phone', 'roles', 'status', 'last_seen', 'actions']));
+
+        $this->assertStringContainsString(route('admin.access.users.impersonate', $this->cashier), $rows);
+        $this->assertStringNotContainsString(route('admin.access.users.impersonate', $this->admin), $rows);
+        $this->assertStringNotContainsString(route('admin.access.users.impersonate', $inactive), $rows);
     }
 
     public function test_leave_without_impersonation_does_nothing(): void

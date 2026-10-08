@@ -12,6 +12,8 @@ use Tests\TestCase;
 
 class UserLifecycleTest extends TestCase
 {
+    private const COLUMNS = ['id', 'user', 'phone', 'roles', 'status', 'last_seen', 'actions'];
+
     use RefreshDatabase;
 
     private User $admin;
@@ -38,8 +40,10 @@ class UserLifecycleTest extends TestCase
     {
         $this->actingAs($this->admin)->delete("/admin/access/users/{$this->cashier->id}");
 
-        $this->actingAs($this->admin)->get('/admin/access/users')->assertDontSee($this->cashier->email);
-        $this->actingAs($this->admin)->get('/admin/access/users?status=deleted')->assertOk()->assertSee($this->cashier->email);
+        $this->actingAs($this->admin);
+        $this->assertStringNotContainsString($this->cashier->email, $this->dataTableText($this->dataTable(route('admin.access.users.data'), self::COLUMNS)));
+        $this->assertStringContainsString($this->cashier->email, $this->dataTableText($this->dataTable(route('admin.access.users.data'), self::COLUMNS, ['status' => 'deleted'])));
+        $this->get('/admin/access/users?status=deleted')->assertOk();
 
         // Deleted users can't sign in.
         auth()->logout();
@@ -63,7 +67,10 @@ class UserLifecycleTest extends TestCase
 
     public function test_deleted_tab_needs_delete_permission(): void
     {
-        $this->actingAs($this->userWithRole(SystemRole::Manager))->get('/admin/access/users?status=deleted')->assertForbidden();
+        $manager = $this->userWithRole(SystemRole::Manager);
+
+        $this->actingAs($manager)->get('/admin/access/users?status=deleted')->assertForbidden();
+        $this->actingAs($manager)->dataTable(route('admin.access.users.data'), self::COLUMNS, ['status' => 'deleted'])->assertForbidden();
     }
 
     public function test_show_page_lists_effective_permissions_sessions_and_devices(): void

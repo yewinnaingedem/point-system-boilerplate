@@ -11,6 +11,8 @@ class ApiTokenAdminTest extends TestCase
 {
     use RefreshDatabase;
 
+    private const COLUMNS = ['owner', 'device', 'signed_in', 'last_used', 'expires', 'actions'];
+
     public function test_admin_lists_and_revokes_device_tokens(): void
     {
         $this->seedAccess();
@@ -19,7 +21,12 @@ class ApiTokenAdminTest extends TestCase
         $phone = $cashier->createToken('Counter phone');
         $cashier->createToken('Tablet');
 
-        $this->actingAs($admin)->get('/admin/api-tokens')->assertOk()->assertSee('Counter phone')->assertSee($cashier->name);
+        $this->actingAs($admin)->get('/admin/api-tokens')->assertOk();
+        $response = $this->dataTable(route('admin.api-tokens.data'), self::COLUMNS);
+        $this->assertStringContainsString('Counter phone', $this->dataTableText($response));
+        $this->assertStringContainsString($cashier->name, $this->dataTableText($response));
+        $this->assertSame(self::COLUMNS, array_keys($response->json('data.0')), 'no token hash or abilities are sent');
+        $this->assertSame(1, $this->dataTable(route('admin.api-tokens.data'), self::COLUMNS, search: 'Tab')->json('recordsFiltered'));
 
         $this->actingAs($admin)->delete("/admin/api-tokens/{$phone->accessToken->id}")->assertRedirect();
         $this->assertSame(['Tablet'], $cashier->tokens()->pluck('name')->all());
@@ -32,6 +39,9 @@ class ApiTokenAdminTest extends TestCase
     {
         $this->seedAccess();
 
-        $this->actingAs($this->userWithRole(SystemRole::Manager))->get('/admin/api-tokens')->assertForbidden();
+        $manager = $this->userWithRole(SystemRole::Manager);
+
+        $this->actingAs($manager)->get('/admin/api-tokens')->assertForbidden();
+        $this->actingAs($manager)->dataTable(route('admin.api-tokens.data'), self::COLUMNS)->assertForbidden();
     }
 }
