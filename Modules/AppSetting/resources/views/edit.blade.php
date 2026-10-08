@@ -9,7 +9,7 @@
                 <div class="card-header">
                     <h3 class="card-title">{{ __('Sections') }}</h3>
                 </div>
-                <div class="card-body p-0">
+                <div class="card-body ">
                     <ul class="nav nav-pills flex-column">
                         @foreach ($groups as $group)
                             <li class="nav-item">

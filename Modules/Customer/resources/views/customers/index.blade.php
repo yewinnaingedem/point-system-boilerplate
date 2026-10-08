@@ -46,7 +46,7 @@
                 </div>
             </form>
         </div>
-        <div class="card-body p-0">
+        <div class="card-body ">
             <x-datatable id="customers-table" :source="route('admin.customers.data')" filters="#customer-filters" :order="[[0, 'desc']]"
                          :empty="__('No customers yet. They appear here the first time they sign in from the partner app.')" :loading="__('Loading customers')" class="text-nowrap" :columns="[
                 ['data' => 'id', 'name' => 'id', 'title' => '#', 'orderable' => true, 'class' => 'text-muted', 'priority' => 6],

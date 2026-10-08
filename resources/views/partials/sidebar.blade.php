@@ -11,16 +11,16 @@
     </a>
 
     <div class="sidebar">
-        <div class="user-panel mt-3 pb-3 mb-3 d-flex">
+        <!-- <div class="user-panel mt-3 pb-3 mb-3 d-flex">
             <div class="image">
                 <x-avatar :user="$me" size="34" class="img-circle elevation-2" />
             </div>
             <div class="info">
                 <a href="{{ route('admin.profile.edit') }}" class="d-block">{{ $me->name }}</a>
             </div>
-        </div>
+        </div> -->
 
-        <div class="form-inline">
+        <div class="form-inline mt-3">
             <div class="input-group" data-widget="sidebar-search">
                 <input class="form-control form-control-sidebar" type="search" placeholder="{{ __('Search menu') }}" aria-label="{{ __('Search menu') }}">
                 <div class="input-group-append">

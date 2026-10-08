@@ -12,7 +12,7 @@
                 @endcan
             </div>
         </div>
-        <div class="card-body p-0">
+        <div class="card-body ">
             <x-datatable id="giftcards-table" :source="route('admin.gift-cards.data')" filters="#giftcard-filters" :order="[[2, 'asc']]"
                          :empty="__('No gift cards yet.')" :loading="__('Loading gift cards')" class="text-nowrap" :columns="[
                 ['data' => 'id', 'name' => 'id', 'title' => '#', 'orderable' => true, 'class' => 'text-muted', 'priority' => 9],

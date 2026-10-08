@@ -82,7 +82,7 @@
         <div class="col-xl-5">
             <div class="card card-success card-outline">
                 <div class="card-header"><h3 class="card-title"><i class="fas fa-user-tag mr-1"></i> {{ __('Customers who earned') }}</h3></div>
-                <div class="card-body p-0">
+                <div class="card-body ">
                     <x-datatable id="points-earners" :source="route('admin.loyalty.points-activity.earners')" filters="#activity-filters" :order="[[1, 'desc']]"
                                  :empty="__('Nobody earned points in this period.')" :loading="__('Loading customers')" class="text-nowrap" :columns="[
                         ['data' => 'customer', 'title' => __('Customer'), 'priority' => 1],
@@ -97,7 +97,7 @@
         <div class="col-xl-7">
             <div class="card card-primary card-outline">
                 <div class="card-header"><h3 class="card-title"><i class="fas fa-exchange-alt mr-1"></i> {{ __('All point movements') }}</h3></div>
-                <div class="card-body p-0">
+                <div class="card-body ">
                     <x-datatable id="points-activity" :source="route('admin.loyalty.points-activity.transactions')" filters="#activity-filters" :order="[[0, 'desc']]"
                                  :empty="__('No point movements in this period.')" :loading="__('Loading point movements')" class="text-nowrap" :columns="[
                         ['data' => 'date', 'name' => 'id', 'title' => __('Date'), 'orderable' => true, 'priority' => 1],

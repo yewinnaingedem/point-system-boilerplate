@@ -22,7 +22,7 @@
             </div>
             <div class="card card-primary card-outline">
                 <div class="card-header"><h3 class="card-title"><i class="fas fa-hourglass-half mr-1"></i> {{ __('Points by expiry') }}</h3></div>
-                <div class="card-body p-0">
+                <div class="card-body ">
                     <x-datatable id="point-lots" :source="route('admin.loyalty.points.lots', $customer)" :order="[]" :paging="false"
                                  :empty="__('No unspent points.')" :loading="__('Loading points')" class="text-nowrap" :columns="[
                         ['data' => 'amount', 'title' => __('Points'), 'class' => 'text-right', 'priority' => 1],
@@ -36,7 +36,7 @@
         <div class="col-md-8">
             <div class="card card-primary card-outline">
                 <div class="card-header"><h3 class="card-title"><i class="fas fa-history mr-1"></i> {{ __('History') }}</h3></div>
-                <div class="card-body p-0">
+                <div class="card-body ">
                     <x-datatable id="point-history" :source="route('admin.loyalty.points.history', $customer)"
                                  :empty="__('No points activity yet.')" :loading="__('Loading history')" class="text-nowrap" :columns="[
                         ['data' => 'date', 'name' => 'id', 'title' => __('Date'), 'orderable' => true, 'priority' => 1],
@@ -51,7 +51,7 @@
 
             <div class="card card-primary card-outline">
                 <div class="card-header"><h3 class="card-title"><i class="fas fa-calendar-alt mr-1"></i> {{ __('Month by month') }}</h3></div>
-                <div class="card-body p-0">
+                <div class="card-body ">
                     <x-datatable id="point-months" :source="route('admin.loyalty.points.months', $customer)" :order="[]" :paging="false"
                                  :empty="__('No points activity yet.')" :loading="__('Loading summary')" class="text-nowrap" :columns="[
                         ['data' => 'month', 'title' => __('Month'), 'priority' => 1],

@@ -27,7 +27,7 @@
         <div class="card-header">
             <h3 class="card-title"><i class="fas fa-medal mr-1"></i> {{ __('Tier qualification') }}</h3>
         </div>
-        <div class="card-body p-0">
+        <div class="card-body ">
             <x-datatable id="tiers-table" :source="route('admin.loyalty.tiers.data')" :order="[]" :paging="false"
                          :empty="__('No tiers are configured.')" :loading="__('Loading tiers')" class="text-nowrap" :columns="[
                 ['data' => 'tier', 'title' => __('Tier'), 'priority' => 1],

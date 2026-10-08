@@ -34,7 +34,7 @@
                             <button type="button" class="btn btn-tool" data-card-widget="collapse"><i class="fas fa-minus"></i></button>
                         </div>
                     </div>
-                    <div class="card-body p-0">
+                    <div class="card-body ">
                         <div class="table-responsive">
                             <table class="table m-0">
                                 <thead>

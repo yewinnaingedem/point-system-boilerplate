@@ -46,7 +46,7 @@
                 </div>
             </form>
         </div>
-        <div class="card-body p-0">
+        <div class="card-body ">
             <x-datatable id="exchanges-table" :source="route('admin.gift-card-exchanges.data')" filters="#exchange-filters" :order="[[0, 'desc']]"
                          :empty="__('No gift card exchanges yet.')" :loading="__('Loading exchanges')" class="text-nowrap" :columns="[
                 ['data' => 'date', 'name' => 'id', 'title' => __('Date'), 'orderable' => true, 'priority' => 1],

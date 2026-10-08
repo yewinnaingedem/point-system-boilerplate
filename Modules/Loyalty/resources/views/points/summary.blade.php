@@ -66,7 +66,7 @@
         <div class="col-xl-6">
             <div class="card card-primary card-outline">
                 <div class="card-header"><h3 class="card-title"><i class="fas fa-calendar-alt mr-1"></i> {{ __('Month by month') }}</h3></div>
-                <div class="card-body p-0">
+                <div class="card-body ">
                     <x-datatable id="points-months" :source="route('admin.loyalty.points-summary.months')" :order="[]" :paging="false"
                                  :empty="__('No points activity yet.')" :loading="__('Loading summary')" class="text-nowrap" :columns="[
                         ['data' => 'month', 'title' => __('Month'), 'priority' => 1],
@@ -91,7 +91,7 @@
                         </form>
                     </div>
                 </div>
-                <div class="card-body p-0">
+                <div class="card-body ">
                     <x-datatable id="points-expiring" :source="route('admin.loyalty.points-summary.expiring')" filters="#expiring-filters" :order="[]"
                                  :empty="__('Nothing expires in the next months.')" :loading="__('Loading expiring points')" class="text-nowrap" :columns="[
                         ['data' => 'customer', 'title' => __('Customer'), 'priority' => 1],
