@@ -27,7 +27,7 @@ Settlement. `AGENTS.md` is the short map; this file is the detail and the histor
 | 9. Menu groups | `MenuGroup` treeview; Users/Roles/Permissions under **Access Management** | user request, AdminLTE style |
 | 10. Daily logs | `LOG_STACK=daily`, viewer lists only `laravel-YYYY-MM-DD.log` | match cargo (30 days) |
 | 11. User features | Login as, view page, change password, clear sessions, Deactivated/Deleted tabs, soft delete + restore | parity with the cargo boilerplate (skipped: email confirmation, social unlink, agent upgrade — not used in POS) |
-| 12. Docker + MySQL | `compose.yaml` (app, web:8080, queue, scheduler, mysql:3308, redis:6380); SQLite data moved with `db:import-sqlite` | run like production, next to the cargo containers |
+| 12. Docker + MySQL | `compose.yaml` (app, web:8080, queue, scheduler, mysql:3308, redis:6380); SQLite data moved with `db:import-sqlite`. Later cut to **mysql + redis only**, PHP/Node on the host | run next to the cargo containers; then no PHP image to build |
 
 ### 2026-10-08: loyalty side and UI
 
@@ -47,22 +47,25 @@ Settlement. `AGENTS.md` is the short map; this file is the detail and the histor
 | 25. Points Activity | all customers' point movements and "who earned" per period (today default), type / customer / reference filters; date index on the ledger | user: no place to see incoming points per day or customer |
 | 26. Gift cards | `Modules/GiftCard`: card types with min tier, stock, per-customer limit, validity, optional emailed 2-step code; locked issuing; admin cancel = refund + restock; customer API with `reason` codes | user: exchange points for gift cards with tier limits, out of stock, max attempts, optional 2FA |
 | 24. Partner API | `Modules/Partner`: `POST /api/v1/partner/points` (bearer key, idempotent `reference`, creates customers, optional tier spending), customer points lookup; `CustomerDirectory` shared with SSO | user: points are assigned over the API by the other project |
+| 27. Performance data | `perf:seed`: 100k customers simulated in PHP (`CustomerHistory` with the real `TierStateMachine` and lot rules), multi-row INSERTs with ids from `IdSequence`, `--remove`; ~3M rows in ~2 min on MySQL | user: test the system with 100k-scale data |
+| 28. Docker cut to MySQL + Redis | `compose.yaml` keeps only mysql + redis (project name `point-system-boilerplate`), `docker/` removed; `composer dev` also runs `schedule:work` | user runs PHP on the host |
 
 ## Running and checking
 
-Docker (preferred): `docker compose up -d --build`, app at http://localhost:8080 (`admin@pos.test` /
-`password`), `docker compose exec app php artisan …`. Details and ports: AGENTS.md "Running it (Docker)".
+`docker compose up -d` (MySQL :3308 + Redis :6380 only, project `point-system-boilerplate`), then `composer dev`:
+app at http://localhost:8000 (`admin@pos.test` / `password`). First run: `composer setup`. Details: AGENTS.md "Running it".
 
 On the host, `php` is 7.4 — use 8.4 explicitly (it reaches the Docker MySQL/Redis through `.env`):
 
 ```bash
 P=/opt/homebrew/opt/php@8.4/bin/php
-$P artisan test                           # tests/ + Modules/*/tests, in-memory SQLite (160 tests)
+$P artisan test                           # tests/ + Modules/*/tests, in-memory SQLite (162 tests)
 $P vendor/bin/pint                        # style
 $P /usr/local/bin/composer require ...    # composer must run under 8.4 too
 npm run build                             # after any CSS/JS or new Blade classes
 $P artisan module:seed <Module>           # after adding permissions (idempotent)
-docker compose exec app php artisan merchant:demo-data [--remove]   # sample customers, merchants, redemptions
+$P artisan merchant:demo-data [--remove]   # sample customers, merchants, redemptions
+$P artisan perf:seed [--remove]           # 100k customers, ~3M rows in ~2 min, for performance testing
 ```
 
 - zsh doesn't word-split `$files`: pipe file lists through `xargs` (`grep -rl … | xargs sed -i ''`).
@@ -338,7 +341,7 @@ docker compose exec app php artisan merchant:demo-data [--remove]   # sample cus
 ## Verifying UI changes
 
 Tests prove pages render; they don't prove they look right. For visual changes: `npm run build`, then
-screenshot the Docker app (http://localhost:8080, `admin@pos.test` / `password`) with headless Chrome
+screenshot the app (http://localhost:8000, `admin@pos.test` / `password`) with headless Chrome
 (puppeteer-core against `/Applications/Google Chrome.app`, installed in a scratch folder outside the project):
 
 - light **and** dark (set `localStorage.theme` with `evaluateOnNewDocument`; the user's own browser is dark),

@@ -15,7 +15,7 @@ points and tier spending) and Settlement (paying merchants what redemptions cost
   Font Awesome 5), bundled with Vite. No Tailwind: its reset breaks Bootstrap.
 - `nwidart/laravel-modules` v12 for modules, `spatie/laravel-permission` v6 for roles/permissions,
   `yajra/laravel-datatables-oracle` v12 for server-side lists, `firebase/php-jwt` for customer SSO.
-- DB is MySQL (Docker, see "Running it"); tests use in-memory SQLite.
+- DB is MySQL (Docker container, see "Running it"); tests use in-memory SQLite.
 - **Two kinds of account:** `users` = staff (admin panel, POS app); `customers` = people who earn and
   spend points, signed in from the partner Laravel project. Never mix them.
 
@@ -316,38 +316,29 @@ Send `Authorization: Bearer <token>`. Errors are always JSON (401 no/expired/rev
 - Testing tip: in feature tests call `$this->app['auth']->forgetGuards()` between requests with
   different tokens; Sanctum's guard caches the user inside one test (real requests don't).
 
-## Running it (Docker)
+## Running it (local PHP + Docker for MySQL/Redis)
 
-`compose.yaml` runs the whole stack; ports avoid the cargo project's containers (3307 / 6379).
-
-| Service | What | Host port |
-|---|---|---|
-| `web` | nginx → `public/` | **8080** (`APP_PORT`) |
-| `app` | PHP 8.4-FPM (`docker/php/Dockerfile`), the project is bind-mounted | — |
-| `queue` | `queue:work redis` | — |
-| `scheduler` | `schedule:work` (`sanctum:prune-expired` daily, `loyalty:evaluate-tiers` hourly, `loyalty:expire-points` 00:10) | — |
-| `mysql` | MySQL 8.4, db `pos_system`, volume `mysql-data` | **3308** (`FORWARD_DB_PORT`) |
-| `redis` | Redis 7 (cache + queue), volume `redis-data` | **6380** (`FORWARD_REDIS_PORT`) |
+PHP 8.4 and Node run on your machine; `compose.yaml` only runs **MySQL 8.4** (host port **3308**,
+db `pos_system`, volume `mysql-data`) and **Redis 7** (**6380**, cache + queue). Ports avoid the
+cargo project's containers (3307 / 6379). The compose project is named `point-system-boilerplate`, so it
+manages the existing containers and volumes.
 
 ```bash
-cp .env.example .env               # set DB_PASSWORD / DB_ROOT_PASSWORD, DOCKER_UID/GID = `id -u` / `id -g`,
-                                   # CUSTOMER_SSO_SECRET / _ISSUER for customer sign-in (docs/customer-sso.md),
-                                   # PARTNER_API_KEY for awarding points (docs/partner-api.md)
-composer install && npm install && npm run build
-docker compose up -d --build       # http://localhost:8080
-docker compose exec app php artisan key:generate
-docker compose exec app php artisan migrate --seed
-docker compose exec app php artisan storage:link
-docker compose exec app php artisan merchant:demo-data   # optional sample data; --remove to delete it
+cp .env.example .env     # set DB_PASSWORD / DB_ROOT_PASSWORD (compose reads them too),
+                         # CUSTOMER_SSO_SECRET / _ISSUER for customer sign-in (docs/customer-sso.md),
+                         # PARTNER_API_KEY for awarding points (docs/partner-api.md)
+docker compose up -d     # first start: give MySQL ~20 s before the next step
+composer setup           # install, key, migrate --seed, storage:link, npm build
+composer dev             # http://localhost:8000 + queue:listen, schedule:work, pail logs, vite
+php artisan merchant:demo-data   # optional sample data; --remove to delete it
+php artisan perf:seed            # optional 100k customers for performance testing; --remove to delete it
 ```
 
-- `.env` holds the **host** view (`DB_HOST=127.0.0.1`, `DB_PORT=3308`, `REDIS_PORT=6380`); compose
-  overrides them inside the containers (`mysql:3306`, `redis:6379`). So `php artisan …` works both on
-  the host (PHP 8.4) and via `docker compose exec app php artisan …`. **Don't `config:cache` in
-  development**: it would freeze one set of hosts for both.
+- `.env` points at the containers through the host ports (`DB_HOST=127.0.0.1`, `DB_PORT=3308`, `REDIS_PORT=6380`).
 - Redis client is **predis** (`REDIS_CLIENT=predis`): pure PHP, works without the `redis` extension.
 - Sessions stay in the database (`SESSION_DRIVER=database`), because the user screen lists and clears them.
-- After changing queued code: `docker compose restart queue`. After new permissions: `module:seed <Module>`.
+- `composer dev` runs the scheduler (`sanctum:prune-expired` daily, `loyalty:evaluate-tiers` hourly,
+  `loyalty:expire-points` 00:10) and a queue listener. After new permissions: `module:seed <Module>`.
 - Default sign-in: `admin@pos.test` / `password`. Change it after first sign-in.
 
 **Data moved from SQLite (2026-10-07).** The app first ran on `database/database.sqlite`. Its data was
@@ -361,7 +352,7 @@ renames `user_id` → `customer_id` on the loyalty/redemption tables and refuses
 ## Testing
 
 ```bash
-php artisan test                 # tests/Feature + Modules/*/tests, in-memory SQLite (160 tests)
+php artisan test                 # tests/Feature + Modules/*/tests, in-memory SQLite (162 tests)
 vendor/bin/pint                  # code style
 ```
 
@@ -370,6 +361,11 @@ vendor/bin/pint                  # code style
 - Every module has a "role without permission gets 403" test; `AdminPagesRenderTest` opens every admin page.
 - Row locks and races can't be seen in SQLite: for money/points/tier concurrency, race parallel `php`
   processes against the Docker MySQL (done for tier enrolment and redemptions, incl. with point lots).
+- **Performance data:** `php artisan perf:seed` bulk-creates 100k customers (`perf-N`) with a year of purchases, tiers,
+  expiring point lots, redemptions, gift card exchanges and reversals, plus 1,000 staff (`staffN@perf.pos.test` / `password`),
+  200 merchants (1,000 branches) and 30 gift cards. Options `--customers --users --merchants --gift-cards --days --chunk --seed`.
+  `CustomerHistory` simulates each customer with the real `TierStateMachine` and lot rules, then multi-row INSERTs with
+  ids assigned in PHP (`IdSequence`: run it on a quiet DB). `--remove` deletes exactly that data. `PerformanceDataTest` checks the books.
 - Time-dependent rules (expiry, cycles): `$this->travelTo(...)` in tests; save settings with
   `SettingService::saveGroup($catalog->group('loyalty'), [...])` (all fields of the group).
 
