@@ -68,7 +68,6 @@
                         @forelse ($recentLogins as $login)
                             <tr>
                                 <td>
-                                    <x-avatar :user="$login" size="32" class="mr-2" />
                                     <span class="font-weight-bold">{{ $login->name }}</span>
                                     <small class="text-muted d-none d-md-inline ml-1">{{ $login->email }}</small>
                                 </td>
