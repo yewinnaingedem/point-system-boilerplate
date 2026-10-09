@@ -29,7 +29,7 @@ class MerchantAdminTest extends TestCase
         $this->admin = $this->userWithRole(SystemRole::Administrator);
     }
 
-    public function test_admin_creates_a_merchant_with_branches_and_rewards(): void
+    public function test_admin_creates_a_merchant_with_branches(): void
     {
         $this->actingAs($this->admin);
 
@@ -46,25 +46,15 @@ class MerchantAdminTest extends TestCase
         $this->assertStringContainsString($branch->code, session('success'), 'the new code is shown to the admin');
         $this->assertNotSame($branch->code, $branch->getRawOriginal('code'), 'stored encrypted');
 
-        $this->post(route('admin.merchants.rewards.store', $kfc), ['name' => 'Zinger Burger', 'points_cost' => 500, 'is_active' => '1'])->assertRedirect();
-        $this->post(route('admin.merchants.rewards.store', $kfc), ['name' => 'Bucket', 'points_cost' => 2000, 'payout_amount' => '9000', 'is_active' => '1'])->assertRedirect();
-        $this->assertSame(2, $kfc->rewards()->count());
-
         foreach ([route('admin.merchants.index'), route('admin.merchants.create'), route('admin.merchants.show', $kfc),
-            route('admin.merchants.edit', $kfc), route('admin.merchants.branches.create', $kfc), route('admin.merchants.branches.edit', $branch),
-            route('admin.merchants.rewards.create', $kfc), route('admin.merchants.rewards.edit', $kfc->rewards()->first()),
-            route('admin.redemptions.index')] as $page) {
+            route('admin.merchants.edit', $kfc), route('admin.merchants.branches.create', $kfc), route('admin.merchants.branches.edit', $branch)] as $page) {
             $this->get($page)->assertOk();
         }
 
-        $rewards = $this->dataTable(route('admin.merchants.rewards.data', $kfc), ['reward', 'points', 'payout', 'status', 'actions'],
-            ['columns' => [['data' => 'reward', 'name' => 'name', 'orderable' => 'true']], 'order' => [['column' => 0, 'dir' => 'asc']]])->json('data');
-        $this->assertStringContainsString('Bucket', $rewards[0]['reward']);
-        $this->assertStringContainsString('9,000.00', $rewards[0]['payout']);           // own payout
-        $this->assertStringContainsString('6,250.00', $rewards[1]['payout']);           // 500 x 12.5 by rate
-
-        $merchants = $this->dataTable(route('admin.merchants.data'), ['id', 'merchant', 'branches', 'rewards', 'rate', 'unsettled', 'status', 'actions'])->json('data');
+        $merchants = $this->dataTable(route('admin.merchants.data'), ['id', 'merchant', 'branches', 'rate', 'status', 'actions'])->json('data');
         $this->assertSame('1', $merchants[0]['branches']);
+        $this->assertArrayNotHasKey('rewards', $merchants[0]);
+        $this->get(route('admin.merchants.show', $kfc))->assertOk()->assertDontSee('rewards-table');
     }
 
     public function test_branch_code_can_be_replaced_and_is_hidden_without_permission(): void
@@ -108,7 +98,6 @@ class MerchantAdminTest extends TestCase
         $this->get(route('admin.merchants.index'))->assertForbidden();
         $this->get(route('admin.merchants.show', $kfc))->assertForbidden();
         $this->post(route('admin.merchants.store'), ['name' => 'X', 'settlement_rate' => 1])->assertForbidden();
-        $this->get(route('admin.redemptions.index'))->assertForbidden();
         $this->dataTable(route('admin.merchants.data'), ['id'])->assertForbidden();
     }
 

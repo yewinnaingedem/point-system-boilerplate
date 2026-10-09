@@ -11,6 +11,15 @@
         </div>
         <div class="col-md-4 col-sm-6">
             <div class="info-box">
+                <span class="info-box-icon bg-info elevation-1"><i class="fas fa-store"></i></span>
+                <div class="info-box-content">
+                    <span class="info-box-text">{{ __('Used at shops today') }}</span>
+                    <span class="info-box-number">{{ number_format($usedToday) }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4 col-sm-12">
+            <div class="info-box">
                 <span class="info-box-icon bg-warning elevation-1"><i class="fas fa-shield-alt"></i></span>
                 <div class="info-box-content">
                     <span class="info-box-text">{{ __('Waiting for a code') }}</span>
@@ -20,6 +29,14 @@
         </div>
     </div>
     <div class="card card-primary card-outline">
+        <div class="card-header">
+            <h3 class="card-title mt-1"><i class="fas fa-exchange-alt mr-1"></i> {{ __('Exchanges') }}</h3>
+            @can('create-giftcardexchange')
+                <div class="card-tools">
+                    <a href="{{ route('admin.gift-card-exchanges.create') }}" class="btn btn-primary btn-sm"><i class="fas fa-plus mr-1"></i>{{ __('Exchange for a customer') }}</a>
+                </div>
+            @endcan
+        </div>
         <div class="card-body border-bottom">
             <form id="exchange-filters" class="form-row">
                 <div class="col-md-5 mb-2 mb-md-0">
@@ -56,7 +73,7 @@
                 ['data' => 'code', 'title' => __('Code'), 'class' => 'text-monospace', 'priority' => 4],
                 ['data' => 'expires', 'title' => __('Valid until'), 'class' => 'text-muted'],
                 ['data' => 'status', 'title' => __('Status'), 'priority' => 2],
-                ['data' => 'actions', 'title' => '', 'class' => 'text-right'],
+                ['data' => 'actions', 'title' => __('Actions'), 'class' => 'text-right', 'priority' => 1],
             ]" />
         </div>
     </div>

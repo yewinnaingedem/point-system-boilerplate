@@ -24,8 +24,8 @@ class GiftCardsTable
         $search = $request->searchTerm();
         /** @var Collection<string, LoyaltyTier> $tiers */
         $tiers = LoyaltyTier::query()->get()->keyBy(fn (LoyaltyTier $tier) => $tier->tier_level->value);
-        $query = GiftCard::query()->select('gift_cards.*')
-            ->withCount(['exchanges as issued_count' => fn (Builder $q) => $q->where('status', ExchangeStatus::Issued)]);
+        $query = GiftCard::query()->select('gift_cards.*')->with('merchant:id,name')
+            ->withCount(['exchanges as issued_count' => fn (Builder $q) => $q->whereIn('status', ExchangeStatus::counted())]);
 
         return $this->datatables->eloquent($query)
             ->filter(fn (Builder $q) => $q->when($search, fn (Builder $q) => $q->where('name', 'like', "{$search}%")))

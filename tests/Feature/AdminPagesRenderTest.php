@@ -46,13 +46,17 @@ class AdminPagesRenderTest extends TestCase
             '/admin/loyalty/points/adjust',
             '/admin/loyalty/points/summary',
             '/admin/loyalty/points/activity',
+            '/admin/loyalty/points/earned',
             '/admin/merchants',
             '/admin/merchants/create',
-            '/admin/redemptions',
             '/admin/customers',
             '/admin/gift-cards',
             '/admin/gift-cards/create',
             '/admin/gift-cards/exchanges',
+            '/admin/gift-cards/exchanges/create',
+            '/admin/claims',
+            '/admin/api-clients',
+            '/admin/api-clients/create',
         ];
 
         foreach ($pages as $page) {

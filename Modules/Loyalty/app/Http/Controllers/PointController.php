@@ -5,6 +5,7 @@ namespace Modules\Loyalty\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Modules\Customer\Models\Customer;
 use Modules\Loyalty\Exceptions\InsufficientPoints;
@@ -57,9 +58,14 @@ class PointController extends Controller
         return $table->response($customer->id);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
-        return view('loyalty::points.adjust');
+        // Back from a failed save, or "Adjust points" from a customer's page: that customer is chosen.
+        $id = $request->old('customer_id', $request->query('customer_id'));
+
+        return view('loyalty::points.adjust', [
+            'customer' => $id ? Customer::query()->with(['pointAccount', 'tierStatus'])->find((int) $id) : null,
+        ]);
     }
 
     public function store(AdjustPointsRequest $request): RedirectResponse

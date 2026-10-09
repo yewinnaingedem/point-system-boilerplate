@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Modules\Loyalty\Http\Controllers\EarnedPointsController;
 use Modules\Loyalty\Http\Controllers\LoyaltyTierController;
 use Modules\Loyalty\Http\Controllers\PointActivityController;
 use Modules\Loyalty\Http\Controllers\PointController;
@@ -16,6 +17,9 @@ Route::middleware('admin')->prefix('admin/loyalty')->name('admin.loyalty.')->gro
     Route::get('points/data', [PointController::class, 'data'])->middleware('permission:view-point')->name('points.data');
     Route::get('points/adjust', [PointController::class, 'create'])->middleware('permission:adjust-point')->name('points.create');
     Route::post('points/adjust', [PointController::class, 'store'])->middleware('permission:adjust-point')->name('points.store');
+    // Own name prefix (points-earned.*), so the "Customer Points" item (points.*) doesn't light up here.
+    Route::get('points/earned', [EarnedPointsController::class, 'index'])->middleware('permission:view-point')->name('points-earned.index');
+    Route::get('points/earned/data', [EarnedPointsController::class, 'data'])->middleware('permission:view-point')->name('points-earned.data');
     Route::get('points/activity', [PointActivityController::class, 'index'])->middleware('permission:view-point')->name('points-activity.index');
     Route::get('points/activity/transactions', [PointActivityController::class, 'transactions'])->middleware('permission:view-point')->name('points-activity.transactions');
     Route::get('points/activity/earners', [PointActivityController::class, 'earners'])->middleware('permission:view-point')->name('points-activity.earners');

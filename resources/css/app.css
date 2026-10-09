@@ -12,7 +12,7 @@
 }
 
 /* Plain content links only; AdminLTE styles its own nav, buttons and box footers. */
-.content-wrapper a:not(.btn):not(.nav-link):not(.dropdown-item):not(.page-link):not(.small-box-footer):not(.badge),
+.content-wrapper a:not(.btn):not(.nav-link):not(.dropdown-item):not(.page-link):not(.small-box-footer):not(.badge):not(.module-card-link):not(.module-card-sublink),
 .login-page a:not(.btn) {
     color: var(--brand);
 }
@@ -291,6 +291,195 @@ body.dark-mode {
     padding-bottom: 0.5rem;
     margin-bottom: 0.5rem;
     border-bottom: 1px solid #4f5962;
+}
+
+/* Sidebar child links (inside a group): indented by nav-child-indent, slightly smaller and with a
+   thin guide line, so "Merchants ▸ Merchants" reads as parent and child. */
+.nav-sidebar .nav-sidebar-children {
+    border-left: 1px solid rgba(255, 255, 255, 0.12);
+    margin-left: 1.15rem;
+}
+.nav-sidebar.nav-child-indent .nav-sidebar-children .nav-link {
+    /* AdminLTE gives every sidebar link a fixed 250px width (.sidebar-mini .main-sidebar .nav-link),
+       which runs past the edge once indented; children size to their (indented) list instead. */
+    width: calc(100% - 0.5rem) !important;
+    padding-left: 0.75rem;
+    font-size: 0.93rem;
+}
+.nav-sidebar .nav-sidebar-children .nav-link:not(.active) {
+    color: #b8c0c8;
+}
+.sidebar-collapse .main-sidebar:not(:hover) .nav-sidebar .nav-sidebar-children {
+    border-left: 0;
+    margin-left: 0;
+}
+
+/* Dashboard: welcome card and module cards, in the brand colour only. */
+.dashboard-welcome {
+    border-left: 4px solid var(--brand);
+}
+.dashboard-section-title {
+    margin: 1.25rem 0 0.75rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #6c757d;
+}
+.module-card {
+    position: relative;
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.module-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.12);
+}
+.module-card-link,
+.module-card-link:hover {
+    color: inherit;
+    text-decoration: none;
+}
+.module-card-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    margin-right: 0.75rem;
+    font-size: 1.15rem;
+    color: var(--brand);
+    background: color-mix(in srgb, var(--brand) 12%, transparent);
+    border-radius: 0.5rem;
+}
+.module-card-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+.module-card-arrow {
+    font-size: 0.8rem;
+    color: #adb5bd;
+}
+.module-card:hover .module-card-arrow,
+.module-card:hover .module-card-title {
+    color: var(--brand);
+}
+/* A group's other pages stay clickable above the card-wide link. */
+.module-card-links {
+    position: relative;
+    z-index: 2;
+    padding-left: 3.5rem;
+    font-size: 0.9rem;
+}
+.module-card-links li + li {
+    margin-top: 0.15rem;
+}
+.module-card-sublink {
+    color: #6c757d;
+}
+.module-card-sublink:hover {
+    color: var(--brand);
+}
+.dark-mode .module-card-icon {
+    background: color-mix(in srgb, var(--brand) 25%, transparent);
+    color: #fff;
+}
+.dark-mode .module-card-link,
+.dark-mode .module-card-link:hover {
+    color: #fff;
+}
+.dark-mode .module-card-sublink,
+.dark-mode .dashboard-section-title {
+    color: #adb5bd;
+}
+.dark-mode .module-card:hover .module-card-title,
+.dark-mode .module-card:hover .module-card-arrow,
+.dark-mode .module-card-sublink:hover {
+    color: #fff;
+}
+
+input {
+    height: 100%;
+}
+
+/* Searchable dropdowns (Select2, ui/select.js): brand focus colour, validation, small size. */
+.select2-container--bootstrap4.select2-container--focus .select2-selection,
+.select2-container--bootstrap4.select2-container--open .select2-selection {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--brand) 25%, transparent);
+}
+.select2-container--bootstrap4 .select2-results__option--highlighted,
+.select2-container--bootstrap4 .select2-results__option--highlighted.select2-results__option[aria-selected='true'] {
+    background-color: var(--brand) !important;
+    color: #fff !important;
+}
+.select2-container--bootstrap4 .select2-dropdown {
+    border-color: var(--brand);
+}
+.select2-container--bootstrap4 .select2-search--dropdown .select2-search__field:focus {
+    border-color: var(--brand);
+    outline: 0;
+}
+.select2-container--bootstrap4.is-invalid .select2-selection {
+    border-color: #dc3545;
+}
+.select2-container--bootstrap4.is-invalid ~ .invalid-feedback {
+    display: block;
+}
+.select2-container--bootstrap4.select2-sm .select2-selection--single {
+    height: calc(1.5em + 0.5rem + 2px) !important;
+    font-size: 0.875rem;
+}
+.select2-container--bootstrap4.select2-sm .select2-selection--single .select2-selection__rendered {
+    line-height: calc(1.5em + 0.5rem);
+    padding-left: 0.5rem;
+}
+.select2-container--bootstrap4.select2-sm .select2-selection__arrow {
+    top: 0 !important;
+    height: 100% !important;
+}
+.select2-container--bootstrap4 .select2-results__option--disabled {
+    color: #adb5bd;
+}
+/* Customer picker rows (data-template="customer"): name, contact line, tier · points on the right. */
+.select2-customer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    width: 100%;
+}
+.select2-customer-name {
+    font-weight: 600;
+}
+.select2-customer-detail {
+    flex-basis: 100%;
+    order: 3;
+    font-size: 0.85em;
+    opacity: 0.75;
+}
+.select2-customer-facts {
+    margin-left: auto;
+    padding-left: 0.75rem;
+    font-size: 0.85em;
+    opacity: 0.8;
+}
+.select2-selection__rendered .select2-customer {
+    flex-wrap: nowrap;
+}
+
+/* Dark mode: the closed box matches the dark form controls (AdminLTE only darkens the open list). */
+.dark-mode .select2-container--bootstrap4 .select2-selection {
+    background-color: #343a40;
+    border-color: #6c757d;
+}
+.dark-mode .select2-container--bootstrap4 .select2-selection--single .select2-selection__rendered {
+    color: #fff;
+}
+.dark-mode .select2-container--bootstrap4 .select2-selection__placeholder {
+    color: #adb5bd !important;
+}
+.dark-mode .select2-container--bootstrap4 .select2-selection--single .select2-selection__arrow b {
+    border-top-color: #adb5bd;
 }
 
 /* Customer initials avatar (Customer module partials/avatar). */

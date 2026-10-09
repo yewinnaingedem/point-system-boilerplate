@@ -46,6 +46,9 @@ export function initForms() {
         }
     });
 
+    // Print the page (AdminLTE's print styles hide the sidebar and .no-print): <button data-print>.
+    $(document).on('click', '[data-print]', () => window.print());
+
     // Submit filter forms when a select changes: <select data-autosubmit>.
     $(document).on('change', '[data-autosubmit]', function () {
         this.form.submit();

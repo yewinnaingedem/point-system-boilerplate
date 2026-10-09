@@ -38,12 +38,22 @@ class MemberPointsTest extends TestCase
         $member = Customer::factory()->create(['email' => 'aye@pos.test', 'phone' => '0977']);
         $this->actingAs($admin);
 
-        $this->post(route('admin.loyalty.points.store'), ['customer' => '0977', 'points' => 500, 'note' => 'Welcome bonus'])
+        $this->post(route('admin.loyalty.points.store'), ['customer_id' => $member->id, 'points' => 500, 'note' => 'Welcome bonus'])
             ->assertRedirect(route('admin.loyalty.points.show', $member))->assertSessionHas('success');
-        $this->post(route('admin.loyalty.points.store'), ['customer' => 'aye@pos.test', 'points' => -900, 'note' => 'Too much'])
+        $this->post(route('admin.loyalty.points.store'), ['customer_id' => $member->id, 'points' => -900, 'note' => 'Too much'])
             ->assertSessionHasErrors('points');
-        $this->post(route('admin.loyalty.points.store'), ['customer' => 'nobody@pos.test', 'points' => 5, 'note' => 'x'])
-            ->assertSessionHasErrors('customer');
+        $this->post(route('admin.loyalty.points.store'), ['customer_id' => 999999, 'points' => 5, 'note' => 'x'])
+            ->assertSessionHasErrors('customer_id');
+        $this->post(route('admin.loyalty.points.store'), ['customer' => '0977', 'points' => 5, 'note' => 'x']) // free text is not accepted
+            ->assertSessionHasErrors('customer_id');
+
+        // From the customer's page, the form opens with them already chosen.
+        $this->get(route('admin.loyalty.points.create', ['customer_id' => $member->id]))->assertOk()
+            ->assertSee('value="'.$member->id.'" selected', false);
+        $member->update(['is_active' => false]);
+        $this->post(route('admin.loyalty.points.store'), ['customer_id' => $member->id, 'points' => 5, 'note' => 'x'])
+            ->assertSessionHasErrors('customer_id');
+        $member->update(['is_active' => true]);
 
         $this->assertSame(500, app(PointWallet::class)->balance($member->id));
         foreach ([route('admin.loyalty.points.index'), route('admin.loyalty.points.create'), route('admin.loyalty.points.show', $member)] as $page) {
@@ -78,6 +88,6 @@ class MemberPointsTest extends TestCase
         $this->actingAs($this->userWithRole(SystemRole::Cashier));
 
         $this->get(route('admin.loyalty.points.index'))->assertForbidden();
-        $this->post(route('admin.loyalty.points.store'), ['customer' => 'x', 'points' => 1, 'note' => 'x'])->assertForbidden();
+        $this->post(route('admin.loyalty.points.store'), ['customer_id' => 1, 'points' => 1, 'note' => 'x'])->assertForbidden();
     }
 }

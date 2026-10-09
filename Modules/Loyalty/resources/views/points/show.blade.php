@@ -16,7 +16,7 @@
                 </div>
                 @can('adjust-point')
                     <div class="card-footer">
-                        <a href="{{ route('admin.loyalty.points.create', ['customer' => $customer->email ?? $customer->phone]) }}" class="btn btn-primary btn-block"><i class="fas fa-exchange-alt mr-1"></i>{{ __('Adjust points') }}</a>
+                        <a href="{{ route('admin.loyalty.points.create', ['customer_id' => $customer->id]) }}" class="btn btn-primary btn-block"><i class="fas fa-exchange-alt mr-1"></i>{{ __('Adjust points') }}</a>
                     </div>
                 @endcan
             </div>

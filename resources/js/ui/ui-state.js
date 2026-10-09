@@ -1,7 +1,6 @@
 /**
  * Remembers layout choices in localStorage (this browser only):
  *  - sidebar collapsed or expanded (header ☰ button), desktop widths only
- *  - which sidebar groups are open           <li data-menu-group="key">
  *  - which cards are collapsed               <div class="card" data-remember-card="key">
  * The inline scripts partials/sidebar-state-init and partials/ui-state-restore apply them
  * before the page paints; this file only saves changes.
@@ -31,13 +30,14 @@ export function initUiState() {
         }
     });
 
-    // Fired on the menu after a group opens or closes; record every group's current state.
-    $(document).on('expanded.lte.treeview collapsed.lte.treeview', () => {
-        const groups = read('sidebar.groups');
-        $('[data-menu-group]').each(function () {
-            groups[this.dataset.menuGroup] = this.classList.contains('menu-open');
+    // One sidebar group open at a time, across all sections (AdminLTE's own accordion only works
+    // inside one list, and the sidebar has one list per section).
+    $(document).on('click', '.nav-sidebar [data-menu-group] > .nav-link', function () {
+        const group = this.parentElement;
+        $('.nav-sidebar [data-menu-group].menu-open').not(group).each(function () {
+            $(this).removeClass('menu-open menu-is-opening');
+            $(this).children('.nav-treeview').stop(true, true).slideUp(300);
         });
-        write('sidebar.groups', groups);
     });
 
     // Fired by the collapse button as the animation starts, so use the event, not the class.

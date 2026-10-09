@@ -44,9 +44,9 @@ class CustomerServiceProvider extends ModuleServiceProvider
             label: 'Customers',
             route: 'admin.customers.index',
             icon: 'fas fa-user-tag',
-            section: 'Sales',
+            section: 'Access Management',
             permission: 'view-customer',
-            order: 40,
+            order: 30,
         ));
     }
 }

@@ -3,12 +3,15 @@
 namespace Modules\Loyalty\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 use Modules\Customer\Models\Customer;
 
 class AdjustPointsRequest extends FormRequest
 {
     private const MAX_POINTS = 100000000;
+
+    private ?Customer $customer = null;
 
     public function authorize(): bool
     {
@@ -21,27 +24,25 @@ class AdjustPointsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'customer' => ['required', 'string', 'max:150'],
+            // Picked in the customer search (customer::partials.select), so it is always one exact customer.
+            'customer_id' => ['required', 'integer', Rule::exists('customers', 'id')],
             'points' => ['required', 'integer', 'not_in:0', 'between:-'.self::MAX_POINTS.','.self::MAX_POINTS],
             'note' => ['required', 'string', 'max:255'],
         ];
     }
 
-    /** The customer is entered by email or phone. */
     public function after(): array
     {
         return [function (Validator $validator) {
-            if (! $validator->errors()->has('customer') && $this->customer() === null) {
-                $validator->errors()->add('customer', __('No customer has this email or phone.'));
+            if (! $validator->errors()->has('customer_id') && ! $this->customer()->is_active) {
+                $validator->errors()->add('customer_id', __('This customer is deactivated.'));
             }
         }];
     }
 
-    public function customer(): ?Customer
+    public function customer(): Customer
     {
-        $login = trim((string) $this->input('customer'));
-
-        return $login === '' ? null : Customer::query()->where('email', $login)->orWhere('phone', $login)->first();
+        return $this->customer ??= Customer::query()->findOrFail((int) $this->input('customer_id'));
     }
 
     /**
@@ -49,6 +50,6 @@ class AdjustPointsRequest extends FormRequest
      */
     public function attributes(): array
     {
-        return ['note' => __('reason')];
+        return ['note' => __('reason'), 'customer_id' => __('customer')];
     }
 }

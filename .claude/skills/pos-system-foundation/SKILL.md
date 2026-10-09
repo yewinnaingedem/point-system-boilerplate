@@ -48,6 +48,19 @@ Settlement. `AGENTS.md` is the short map; this file is the detail and the histor
 | 26. Gift cards | `Modules/GiftCard`: card types with min tier, stock, per-customer limit, validity, optional emailed 2-step code; locked issuing; admin cancel = refund + restock; customer API with `reason` codes | user: exchange points for gift cards with tier limits, out of stock, max attempts, optional 2FA |
 | 24. Partner API | `Modules/Partner`: `POST /api/v1/partner/points` (bearer key, idempotent `reference`, creates customers, optional tier spending), customer points lookup; `CustomerDirectory` shared with SSO | user: points are assigned over the API by the other project |
 | 27. Performance data | `perf:seed`: 100k customers simulated in PHP (`CustomerHistory` with the real `TierStateMachine` and lot rules), multi-row INSERTs with ids from `IdSequence`, `--remove`; ~3M rows in ~2 min on MySQL | user: test the system with 100k-scale data |
+| 29. Signed gateway | `POST /api/v1/gateway`: KBZPay-style envelope (`Request` → timestamp, method, nonce_str, sign_type, sign, version, biz_content), `api_clients` (appid + encrypted secret, admin screen), one `GatewayMethod` class per method reusing the module services, signed `Response` envelope with stable codes | user: one validated API like KBZPay for points, customer register, gift cards, redemptions, tier status; IP allow-list later |
+| 30. Reward admin removed | merchant page Rewards table, reward routes/controller/request/table/views and the merchants-list Rewards column deleted; model, table, service, API kept | user: the app only spends points on gift cards, so the reward screen was unused; "touch reward only, break nothing" |
+| 31. Gift cards used at branches | `useAtBranch` + status `used` (merchant, branch, payout = face value, settlement_id), `BranchCodeVerifier` shared with redemptions, gateway `pos.giftcard.use`, rewards and redemption methods out of the gateway and Postman | user: branches ("child shops") complete the gift card exchange instead of rewards |
+| 32. Merchant claims | Merchants ▸ Claims: owed per merchant, statement (period, print, CSV), Mark as paid → `gift_card_settlements`; `MerchantClaimService` re-checks count + total under lock; `[data-print]` in forms.js | user: how does a merchant know what to claim for used gift cards; "simple and classic" tables |
+| 33. Redemptions screen removed | menu item, routes, controller, table, requests, views, `view/reverse-redemption` permissions (also deleted from the DB; no role had them), redemption "owed" on the merchants list/page; service + data kept | user: the reward-at-shop redemption list is unused |
+| 34. Merchant users + claims CRUD | `users.merchant_id` + Merchant role, `LimitToOwnMerchant` middleware (route params must be theirs), merchant form keeps rate/status/notes ours; settlements → `merchant_claims` (Submitted → Paid / Rejected, edit/delete while submitted, admin can claim for a shop) | user: KFC manager/cashier sees only their own shop and claims; old-style shops are handled by the admin |
+| 35. Exchanges as CRUD | list with View only, exchange page with cancel / emailed-code box, staff "Exchange for a customer" (`create-giftcardexchange`) through the normal `request()` (two-step still emails) | user: everything was on one page |
+| 36. API Tokens screen removed | sidebar item + screen gone; staff app login and `ApiTokenService` unchanged | user: API Clients replaced it in their workflow |
+| 37. Sidebar sections | Dashboard on top; sections Access Management (Roles, Users, Customers, Permissions), Management, Log Management; indented children; one open group | user: clearer parent/child, other groups close |
+| 38. Dashboard + gift card shops | dashboard = welcome + module cards from `MenuRegistry` (`ModuleCards`) + recent sign-ins, brand colour only; `gift_cards.merchant_id` (optional) with `wrong_shop` | user: dashboard of module cards; "attach gift card to merchant so everything links" |
+| 39. Searchable dropdowns | `ui/select.js`: Select2 4.1 + Bootstrap 4 theme from `admin-lte/plugins` (no new package), lazy chunk, every `.content-wrapper select` except DataTables' per-page and `[data-native]`; brand focus/highlight, dark closed box, `is-invalid`, small size | user: every dropdown styled and searchable |
+| 40. Points group + Earned Points | sidebar Points ▸ Earned Points / Customer Points / Points Activity / Points Summary, Loyalty Tiers on its own; Earned Points = DataTable over `loyalty_point_lots` joined to the transaction, `EarnedPointStatus` (same rule in PHP and SQL), routes `points-earned.*` before `points/{customer}` | user: points screens hard to find; wanted an earned-points table for all customers with filters |
+| 41. Customer picker | `CustomerSearchController` (Select2 JSON) + `customer::partials.select`; select.js `data-search-url` mode with a text-only `customer` template; Adjust points / Exchange for a customer post `customer_id` | user: typing an email or phone to adjust points was unsafe |
 | 28. Docker cut to MySQL + Redis | `compose.yaml` keeps only mysql + redis (project name `point-system-boilerplate`), `docker/` removed; `composer dev` also runs `schedule:work` | user runs PHP on the host |
 
 ## Running and checking
@@ -59,7 +72,7 @@ On the host, `php` is 7.4 — use 8.4 explicitly (it reaches the Docker MySQL/Re
 
 ```bash
 P=/opt/homebrew/opt/php@8.4/bin/php
-$P artisan test                           # tests/ + Modules/*/tests, in-memory SQLite (162 tests)
+$P artisan test                           # tests/ + Modules/*/tests, in-memory SQLite (204 tests)
 $P vendor/bin/pint                        # style
 $P /usr/local/bin/composer require ...    # composer must run under 8.4 too
 npm run build                             # after any CSS/JS or new Blade classes
@@ -135,7 +148,7 @@ $P artisan perf:seed [--remove]           # 100k customers, ~3M rows in ~2 min, 
   (`user`, `role`). Top-right under the navbar, CSS countdown bar (5 s, 8 s for warning/error), hover pauses,
   × closes; `toast(type, text)` from JS (text only, never HTML).
 - **Remembered UI state** (localStorage, this browser only): `sidebar` (collapsed, desktop ≥ 992 px only),
-  `sidebar.groups` (open groups; the group of the current page always opens), `cards`
+  (`sidebar.groups` was dropped 2026-10-09: one group open at a time instead), `cards`
   (`data-remember-card="key"`). `sidebar-state-init` (top of body) and `ui-state-restore` (after the content)
   apply them before paint; `ui-state.js` saves on AdminLTE's `collapsed/shown.lte.pushmenu`,
   `expanded/collapsed.lte.treeview`, `expanded/collapsed.lte.cardwidget` events.
@@ -163,7 +176,10 @@ $P artisan perf:seed [--remove]           # 100k customers, ~3M rows in ~2 min, 
 - Markup: one `<ul id="sidebar-section-N" class="nav-sidebar nav-sidebar-section" data-widget="treeview">`
   **per section**, so `app.css` can draw a divider under every section but the last. The `id` is required
   (see traps); `AdminPagesRenderTest` checks it. Code that walks the menu must not assume a single list.
-- Look: parent active = brand blue; active child = AdminLTE's light pill; no `nav-child-indent`
+- Look: parent active = brand blue; active child = AdminLTE's light pill. Since 2026-10-09 children ARE indented
+  (`nav-child-indent` + `.nav-sidebar-children`: guide line, smaller, muted; width overridden because AdminLTE fixes
+  every link at 250px). One group open at a time across all section lists (click handler in `ui-state.js`;
+  AdminLTE's `data-accordion` only covers one `<ul>`). The earlier "no indent" choice was reversed by the user
   (user wanted children on the same left edge).
 
 ### Api (`Modules/Api`)
@@ -181,8 +197,29 @@ $P artisan perf:seed [--remove]           # 100k customers, ~3M rows in ~2 min, 
 - Hardening: `config/sanctum.php guard => []` (admin browser session can't call the API),
   CORS only `CORS_ALLOWED_ORIGINS` (default `APP_URL`), JSON errors for `api/*`
   (`shouldRenderJsonWhen` in `bootstrap/app.php`), responses only via Resources with listed fields.
-- Admin screen **API Tokens** (`view/delete-apitoken`, DataTable): revoke a device or all of a user's devices.
+- The admin **API Tokens** screen was removed (2026-10-09; menu, routes, controller, table, views, `view/delete-apitoken`
+  permissions, also deleted from the DB). Staff devices still show on the user's page; deactivate / password change /
+  delete revoke them (`ApiTokenService` stays, the staff token API is unchanged).
 - New endpoint: staff → staff group + `permission:…`; customer → customer group. Return a Resource.
+
+### Gateway (`Modules/Api/app/Gateway`)
+- `GatewayKernel::handle()` does everything and **never throws**: GatewayError / ValidationException / ModelNotFound /
+  any Throwable (reported) become a `{"Response": …}` with the matching HTTP status. Route has no middleware but `api`.
+- Envelope rules in the kernel (not a FormRequest: its 422 would not be an envelope). biz_content values must be
+  string/int (`after` hook), so the flat signature string is unambiguous.
+- `Signer`: `Arr::dot` of the whole envelope, so request (`biz_content.appid`) and nested response data
+  (`biz_content.items.0.name`) use one rule. Empty arrays/null/'' skipped, bools `true`/`false`.
+- `GatewayEnvelope` JSON-round-trips the body before signing: Resources/Collections inside `resolve()` output are
+  objects, which `Arr::dot` would skip, so the signature would not match what the caller decodes.
+- Nonce: `Cache::add("api-gateway:nonce:{client}:{nonce}", ttl = 2 × tolerance + 60)` after the signature check
+  (so strangers can't burn nonces). Rate limit inside the kernel (`RateLimiter`, client + IP) so 429 is an envelope too.
+- Methods map service exceptions to codes: `ExchangeRejected::reason` uppercased, `RedemptionRejected` →
+  WRONG_CODE / NOT_AVAILABLE / TOO_MANY_ATTEMPTS, `PointAwardConflict` → REFERENCE_CONFLICT.
+- `pos.point.create` without `name` passes the existing profile to `PointAwardService` (its `upsert` would
+  otherwise blank email/phone).
+- `pos.merchant.list` is not paged (all active merchants with branches; rewards dropped 2026-10-09): page it if merchants grow (perf data has 200).
+- `pos.giftcard.use` replaced `pos.redemption.create|list` in the gateway. `UseGiftCard` reads `replayed` from the status before the call.
+- IP allow-list: not built; the spot is marked in `handle()`. Tests: `Modules/Api/tests/Feature/Concerns/CallsGateway`.
 
 ### Customers (`Modules/Customer`)
 - `Customer` (`customers`: external_id unique, name, email, phone, is_active, last_login_at) uses
@@ -333,8 +370,15 @@ $P artisan perf:seed [--remove]           # 100k customers, ~3M rows in ~2 min, 
 | Customer #5 and staff user #5 shared one API rate limit | `throttle:api` keyed by the bare id | key `class_basename(user):id` |
 | Renaming `user_id` → `customer_id` on tables with data | old rows point at users and can't be mapped | migration refuses while rows exist; remove demo data first (`merchant:demo-data --remove`) |
 | Test expectation wrong, code right (reversal across an expired lot) | easy to mis-add lots by hand | write the lot timeline in comments (earned → expires, what each debit took) before the assert |
-| Intermittent failure of `MemberPointsTest::admin adjusts points…` (once in ~10 full runs, never alone) | not found yet | if it shows again, capture the assertion message before changing anything |
+| Intermittent failure of `MemberPointsTest::admin adjusts points…` (once in ~10 full runs, never alone; seen again 2026-10-09, 1 of 4 runs, after JS-only changes) | not found yet | if it shows again, capture the assertion message before changing anything: run the suite with output saved to a file (`php artisan test > run.txt`), not piped through grep |
 | MenuItem active pattern with `(a\|b)` never matches | `routeIs` uses `Str::is` wildcards, not regex | give the routes their own name prefix (`points-summary.*`) |
+| Merchant page boxes stacked for merchant users only | `@endunless` placed before the hidden box's closing `</div>`, closing the row early | keep `@unless` / `@endunless` around the whole column; screenshot as a merchant user too |
+| Claims test: other merchant's reference "visible" | the admin's success toast was still flashed in the test session when acting as the merchant | create test data through the service, not a POST, before switching user |
+| `Cannot use … as GiftCard because the name is already in use` | Pint turns a fully-qualified class into an import; adding the same `use` by hand duplicates it | run Pint, then check imports before adding one |
+| Dashboard card text unreadable in dark mode | the content-link brand colour rule (`.content-wrapper a:not(...)`) beat the card's colour | exclude the classes from that rule (`:not(.module-card-link)`) |
+| Select2 import does nothing (`$.fn.select2` undefined) | the CommonJS build exports a factory `(root, jQuery)` instead of running | call the default export: `install(window, window.jQuery)` |
+| DataTables "per page" select sometimes turned into Select2 | v3 wraps it in `.dt-length` (not `.dataTables_length`); whether it exists when select.js runs depends on which chunk loads first | exclude both class names explicitly |
+| Select2 server search stuck on "Searching…" (`Cannot read properties of undefined (reading 'container')`) | Select2 4.1 maps results with an unbound `_normalizeItem`; bundled as an ES module it runs in strict mode, so `this` is undefined | `patchStrictMode()` in `ui/select.js` wraps `select2/data/select` `_normalizeItem` with a safe `this` |
 | tldraw: diagram drawn on top of an earlier one | `helpers.mermaid()` `blueprintRender.position` is the **centre**, and each diagram is one group | draw far away, measure, then `editor.nudgeShapes` the group into place |
 | tldraw: closing one window closed the others / a new doc window vanished | app window handling | never draw on documents you didn't create; re-list docs by name, reopen your own file with `open -a "tldraw offline" <file>` |
 

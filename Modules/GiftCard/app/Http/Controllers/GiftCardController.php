@@ -5,12 +5,15 @@ namespace Modules\GiftCard\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 use Modules\GiftCard\Http\Requests\GiftCardRequest;
 use Modules\GiftCard\Http\Requests\GiftCardTableRequest;
 use Modules\GiftCard\Models\GiftCard;
 use Modules\GiftCard\Tables\GiftCardsTable;
 use Modules\Loyalty\Enums\TierLevel;
+use Modules\Merchant\Models\Merchant;
 
 class GiftCardController extends Controller
 {
@@ -24,9 +27,10 @@ class GiftCardController extends Controller
         return $table->response($request);
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
-        return view('giftcard::cards.form', ['card' => new GiftCard(['is_active' => true]), 'tiers' => TierLevel::cases()]);
+        return view('giftcard::cards.form', ['card' => new GiftCard(['is_active' => true, 'merchant_id' => $request->integer('merchant_id') ?: null]),
+            'tiers' => TierLevel::cases(), 'merchants' => $this->merchants()]);
     }
 
     public function store(GiftCardRequest $request): RedirectResponse
@@ -38,7 +42,7 @@ class GiftCardController extends Controller
 
     public function edit(GiftCard $giftCard): View
     {
-        return view('giftcard::cards.form', ['card' => $giftCard, 'tiers' => TierLevel::cases()]);
+        return view('giftcard::cards.form', ['card' => $giftCard, 'tiers' => TierLevel::cases(), 'merchants' => $this->merchants()]);
     }
 
     public function update(GiftCardRequest $request, GiftCard $giftCard): RedirectResponse
@@ -57,5 +61,11 @@ class GiftCardController extends Controller
         $giftCard->delete();
 
         return redirect()->route('admin.gift-cards.index')->with('success', __('Gift card :name deleted.', ['name' => $giftCard->name]));
+    }
+
+    /** @return Collection<int, string> */
+    private function merchants(): Collection
+    {
+        return Merchant::query()->orderBy('name')->pluck('name', 'id');
     }
 }

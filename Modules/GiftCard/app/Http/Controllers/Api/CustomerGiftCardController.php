@@ -23,8 +23,9 @@ class CustomerGiftCardController extends Controller
     {
         $customer = $request->user();
 
-        return response()->json(['data' => GiftCard::query()->active()->orderBy('points_cost')->get()->map(fn (GiftCard $card) => [
+        return response()->json(['data' => GiftCard::query()->active()->with('merchant:id,name')->orderBy('points_cost')->get()->map(fn (GiftCard $card) => [
             'id' => $card->id,
+            'merchant' => $card->merchant ? ['id' => $card->merchant->id, 'name' => $card->merchant->name] : null, // null = any partner shop
             'name' => $card->name,
             'description' => $card->description,
             'points' => $card->points_cost,
@@ -54,8 +55,8 @@ class CustomerGiftCardController extends Controller
 
     public function mine(Request $request): AnonymousResourceCollection
     {
-        return ExchangeResource::collection(GiftCardExchange::query()->with('giftCard')->where('customer_id', $request->user()->id)
-            ->whereIn('status', [ExchangeStatus::Issued, ExchangeStatus::Cancelled])->latest('id')->paginate(20));
+        return ExchangeResource::collection(GiftCardExchange::query()->with('giftCard.merchant:id,name')->where('customer_id', $request->user()->id)
+            ->whereIn('status', ExchangeStatus::owned())->latest('id')->paginate(20));
     }
 
     private function attempt(callable $action): GiftCardExchange

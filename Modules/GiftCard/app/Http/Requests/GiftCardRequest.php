@@ -3,6 +3,7 @@
 namespace Modules\GiftCard\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Modules\Loyalty\Enums\TierLevel;
 
 class GiftCardRequest extends FormRequest
@@ -18,6 +19,7 @@ class GiftCardRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'merchant_id' => ['nullable', 'integer', Rule::exists('merchants', 'id')],  // empty = any partner shop
             'name' => ['required', 'string', 'max:150'],
             'description' => ['nullable', 'string', 'max:1000'],
             'points_cost' => ['required', 'integer', 'min:1', 'max:100000000'],

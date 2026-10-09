@@ -57,11 +57,13 @@ class LoyaltyServiceProvider extends ModuleServiceProvider
     {
         parent::boot();
 
+        // Management: "Loyalty Tiers" on its own, and a "Points" group with every points screen.
         $this->app->make(MenuRegistry::class)
-            ->addGroup(new MenuGroup('loyalty', 'Loyalty', 'fas fa-medal', 'Sales', 50))
-            ->add(new MenuItem('Tiers', 'admin.loyalty.tiers.index', 'fas fa-layer-group', 'Sales', 'view-loyaltytier', 10, 'admin.loyalty.tiers.*', 'loyalty'))
-            ->add(new MenuItem('Customer Points', 'admin.loyalty.points.index', 'fas fa-coins', 'Sales', 'view-point', 20, 'admin.loyalty.points.*', 'loyalty'))
-            ->add(new MenuItem('Points Activity', 'admin.loyalty.points-activity.index', 'fas fa-exchange-alt', 'Sales', 'view-point', 25, 'admin.loyalty.points-activity.*', 'loyalty'))
-            ->add(new MenuItem('Points Summary', 'admin.loyalty.points-summary.index', 'fas fa-chart-bar', 'Sales', 'view-point', 30, 'admin.loyalty.points-summary.*', 'loyalty'));
+            ->add(new MenuItem('Loyalty Tiers', 'admin.loyalty.tiers.index', 'fas fa-medal', 'Management', 'view-loyaltytier', 50, 'admin.loyalty.tiers.*'))
+            ->addGroup(new MenuGroup('points', 'Points', 'fas fa-coins', 'Management', 55))
+            ->add(new MenuItem('Earned Points', 'admin.loyalty.points-earned.index', 'fas fa-arrow-down', 'Management', 'view-point', 10, 'admin.loyalty.points-earned.*', 'points'))
+            ->add(new MenuItem('Customer Points', 'admin.loyalty.points.index', 'fas fa-wallet', 'Management', 'view-point', 20, 'admin.loyalty.points.*', 'points'))
+            ->add(new MenuItem('Points Activity', 'admin.loyalty.points-activity.index', 'fas fa-exchange-alt', 'Management', 'view-point', 30, 'admin.loyalty.points-activity.*', 'points'))
+            ->add(new MenuItem('Points Summary', 'admin.loyalty.points-summary.index', 'fas fa-chart-bar', 'Management', 'view-point', 40, 'admin.loyalty.points-summary.*', 'points'));
     }
 }

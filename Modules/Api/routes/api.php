@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\Api\Http\Controllers\V1\AuthController;
+use Modules\Api\Http\Controllers\V1\GatewayController;
 use Modules\Api\Http\Controllers\V1\MeController;
 use Modules\Api\Http\Controllers\V1\SettingController;
 use Modules\Api\Http\Middleware\EnsureStaffToken;
@@ -17,7 +18,8 @@ use Modules\Partner\Http\Middleware\AuthenticatePartner;
 /*
  * Mounted at /api by the module's RouteServiceProvider (name prefix `api.`).
  *
- * Staff sign-in and customer SSO are the ONLY routes without a token. Every other route needs
+ * Staff sign-in and customer SSO are the ONLY routes without a token (the gateway authenticates
+ * each request by its signature instead). Every other route needs
  * a valid, unexpired token of the right kind: staff routes refuse customer tokens and the
  * customer routes refuse staff tokens; partner routes need the partner's server key. New POS endpoints go inside the staff group and are
  * gated with ->middleware('permission:<action>-<resource>') like the admin routes.
@@ -26,6 +28,10 @@ Route::prefix('v1')->name('v1.')->group(function () {
     Route::post('auth/login', [AuthController::class, 'login'])
         ->middleware('throttle:api-login')
         ->name('auth.login');
+
+    // Signed gateway for other systems (KBZPay-style envelope; appid + SHA256 signature, see
+    // GatewayKernel and docs/gateway-api.md). Rate-limited per client inside the kernel.
+    Route::post('gateway', GatewayController::class)->name('gateway');
 
     // Staff (POS app): staff tokens only.
     Route::middleware(['auth:sanctum', EnsureStaffToken::class, EnsureTokenUserIsActive::class, 'throttle:api'])->group(function () {

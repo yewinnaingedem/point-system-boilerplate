@@ -1,0 +1,1379 @@
+{
+  "info": {
+    "_postman_id": "bd91b2de-19a1-4165-b6de-10a48397371c",
+    "name": "POS Gateway API",
+    "description": "Signed gateway `POST /api/v1/gateway` (docs/gateway-api.md).\n\n1. Import this collection and `pos-local.postman_environment.json`, select the environment.\n2. Admin → Administration → API Clients → New API client; copy the appid and secret into the environment.\n3. Run `1. Customers → Register customer` first.\n\nRequest bodies only hold `method` and `biz_content`: the collection's pre-request script adds timestamp, nonce_str, version, sign_type, appid and sign. The test script checks the response signature and saves ids for the next requests. Signature trouble: compare the `last_string_to_sign` collection variable with the server's.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Same rule as Modules/Api/app/Gateway/Signer.php (docs/gateway-api.md \"Signing\"):",
+          "// dot-flatten, drop sign/sign_type and empty values, sort keys, k=v&..., &key=<secret>, SHA-256, uppercase.",
+          "function gwFlatten(value, prefix, out) {",
+          "    if (value === null || value === undefined || value === '') return out;",
+          "    if (typeof value === 'object') {",
+          "        Object.keys(value).forEach(k => gwFlatten(value[k], prefix === '' ? k : prefix + '.' + k, out));",
+          "        return out; // an empty object/array adds nothing, like PHP",
+          "    }",
+          "    out[prefix] = typeof value === 'boolean' ? (value ? 'true' : 'false') : String(value);",
+          "    return out;",
+          "}",
+          "function gwStringToSign(envelope) {",
+          "    const copy = Object.assign({}, envelope);",
+          "    delete copy.sign;",
+          "    delete copy.sign_type;",
+          "    const flat = gwFlatten(copy, '', {});",
+          "    return Object.keys(flat).sort().map(k => k + '=' + flat[k]).join('&');",
+          "}",
+          "function gwSign(envelope, secret) {",
+          "    const cryptoJs = require('crypto-js');",
+          "    return cryptoJs.SHA256(gwStringToSign(envelope) + '&key=' + secret).toString(cryptoJs.enc.Hex).toUpperCase();",
+          "}",
+          "",
+          "// Only gateway calls are signed.",
+          "if (pm.request.url.toString().indexOf('/gateway') !== -1) {",
+          "    // Trimmed: a space or line break copied with the key is the most common cause of INVALID_SIGNATURE.",
+          "    const appid = String(pm.variables.get('appid') || '').trim();",
+          "    const secret = String(pm.variables.get('secret') || '').trim();",
+          "    if (!appid || !secret) {",
+          "        throw new Error('Set \"appid\" and \"secret\" in the selected environment (Admin → Administration → API Clients).');",
+          "    }",
+          "    if (!/^[0-9a-f]{64}$/.test(secret)) {",
+          "        throw new Error('\"secret\" must be the 64-character key shown once after creating or rotating the API client (got ' + secret.length + ' characters). Rotate it and paste the new one.');",
+          "    }",
+          "",
+          "    // The body only needs \"method\" and \"biz_content\"; {{variables}} and {{$dynamic}} values are resolved here.",
+          "    const body = JSON.parse(pm.variables.replaceIn(pm.request.body.raw || '{}'));",
+          "    const req = body.Request || {};",
+          "",
+          "    // Error-case requests set \"_case\" to break one thing on purpose; it is never sent.",
+          "    const testCase = req._case || '';",
+          "    delete req._case;",
+          "",
+          "    const nonce = () => { const c = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let s = ''; for (let i = 0; i < 32; i++) s += c[Math.floor(Math.random() * c.length)]; return s; };",
+          "",
+          "    req.timestamp = String(Math.floor(Date.now() / 1000) - (testCase === 'old_timestamp' ? 600 : 0));",
+          "    // reuse_nonce takes the nonce of the last request the server got as far as recording (see the test script).",
+          "    req.nonce_str = (testCase === 'reuse_nonce' && pm.collectionVariables.get('last_used_nonce')) ? pm.collectionVariables.get('last_used_nonce') : nonce();",
+          "    req.version = req.version || '1.0';",
+          "    req.biz_content = Object.assign({ appid: testCase === 'bad_appid' ? 'pos-unknown-appid' : appid }, req.biz_content || {});",
+          "    req.sign_type = 'SHA256';",
+          "    req.sign = gwSign(req, testCase === 'bad_sign' ? secret + 'wrong' : secret);",
+          "",
+          "    // Remember what later requests replay, and the string-to-sign for debugging (never the key).",
+          "    pm.collectionVariables.set('last_nonce', req.nonce_str);",
+          "    pm.collectionVariables.set('last_string_to_sign', gwStringToSign(req));",
+          "    if (req.method === 'pos.point.create' && req.biz_content.reference) pm.collectionVariables.set('last_reference', req.biz_content.reference);",
+          "",
+          "    pm.request.body.update({ mode: 'raw', raw: JSON.stringify({ Request: req }, null, 2), options: { raw: { language: 'json' } } });",
+          "    pm.request.headers.upsert({ key: 'Content-Type', value: 'application/json' });",
+          "}",
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Same rule as Modules/Api/app/Gateway/Signer.php (docs/gateway-api.md \"Signing\"):",
+          "// dot-flatten, drop sign/sign_type and empty values, sort keys, k=v&..., &key=<secret>, SHA-256, uppercase.",
+          "function gwFlatten(value, prefix, out) {",
+          "    if (value === null || value === undefined || value === '') return out;",
+          "    if (typeof value === 'object') {",
+          "        Object.keys(value).forEach(k => gwFlatten(value[k], prefix === '' ? k : prefix + '.' + k, out));",
+          "        return out; // an empty object/array adds nothing, like PHP",
+          "    }",
+          "    out[prefix] = typeof value === 'boolean' ? (value ? 'true' : 'false') : String(value);",
+          "    return out;",
+          "}",
+          "function gwStringToSign(envelope) {",
+          "    const copy = Object.assign({}, envelope);",
+          "    delete copy.sign;",
+          "    delete copy.sign_type;",
+          "    const flat = gwFlatten(copy, '', {});",
+          "    return Object.keys(flat).sort().map(k => k + '=' + flat[k]).join('&');",
+          "}",
+          "function gwSign(envelope, secret) {",
+          "    const cryptoJs = require('crypto-js');",
+          "    return cryptoJs.SHA256(gwStringToSign(envelope) + '&key=' + secret).toString(cryptoJs.enc.Hex).toUpperCase();",
+          "}",
+          "",
+          "if (pm.request.url.toString().indexOf('/gateway') !== -1) {",
+          "    let json = null;",
+          "    try { json = pm.response.json(); } catch (e) { /* not JSON */ }",
+          "",
+          "    pm.test('Answer is a {\"Response\": …} envelope', () => pm.expect(json && json.Response).to.be.an('object'));",
+          "",
+          "    if (json && json.Response) {",
+          "        const res = json.Response;",
+          "        console.log(res.method || '-', pm.response.code, res.code, res.msg);",
+          "",
+          "        // The server records a nonce only once the signature and timestamp passed.",
+          "        const beforeNonce = ['INVALID_REQUEST', 'INVALID_APPID', 'RATE_LIMITED', 'INVALID_SIGNATURE', 'TIMESTAMP_EXPIRED', 'DUPLICATE_NONCE'];",
+          "        if (beforeNonce.indexOf(res.code) === -1) {",
+          "            pm.collectionVariables.set('last_used_nonce', pm.collectionVariables.get('last_nonce'));",
+          "        }",
+          "",
+          "        if (res.sign) {",
+          "            pm.test('Response signature is valid', () => pm.expect(gwSign(res, String(pm.variables.get('secret') || '').trim())).to.eql(res.sign));",
+          "        }",
+          "",
+          "        // The server sends what it signed while APP_DEBUG is on: same string → wrong key; different → content changed.",
+          "        if (res.code === 'INVALID_SIGNATURE' && res.debug && res.debug.string_to_sign) {",
+          "            const ours = pm.collectionVariables.get('last_string_to_sign');",
+          "            if (ours === res.debug.string_to_sign) {",
+          "                console.warn('INVALID_SIGNATURE: the signed content matches the server, so the \"secret\" in your environment is not this appid\\'s key. Rotate the key on the API Clients screen and paste it again.');",
+          "            } else {",
+          "                console.warn('INVALID_SIGNATURE: the signed content differs.\\n  Postman: ' + ours + '\\n  Server:  ' + res.debug.string_to_sign);",
+          "            }",
+          "        }",
+          "",
+          "        // Pick up ids so the next requests in the folder just work.",
+          "        const biz = res.biz_content || {};",
+          "        if (res.result === 'SUCCESS') {",
+          "            if (res.method === 'pos.giftcard.list' && Array.isArray(biz.items) && biz.items.length) {",
+          "                const card = biz.items.find(c => c.available) || biz.items[0];",
+          "                pm.collectionVariables.set('gift_card_id', String(card.id));",
+          "            }",
+          "            if (res.method === 'pos.giftcard.exchange' && biz.id) {",
+          "                pm.collectionVariables.set('exchange_id', String(biz.id));",
+          "                pm.collectionVariables.set('exchange_status', biz.status);",
+          "                console.log(biz.status === 'pending'",
+          "                    ? 'Pending: this card needs the emailed 6-digit code. Put it in giftcard_code and run \"Verify emailed code\".'",
+          "                    : 'Issued at once (no verification on this card). Gift card code: ' + biz.code + '. No need to run \"Verify emailed code\".');",
+          "            }",
+          "            if (res.method === 'pos.merchant.list' && Array.isArray(biz.items)) {",
+          "                const m = biz.items.find(x => x.branches.length);",
+          "                if (m) {",
+          "                    pm.collectionVariables.set('branch_id', String(m.branches[0].id));",
+          "                    console.log('branch_id = ' + m.branches[0].id + ' (' + m.name + ' ' + m.branches[0].name + '). Put that branch\\'s 6-digit code in branch_code.');",
+          "                }",
+          "            }",
+          "        }",
+          "    }",
+          "}",
+          ""
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Customers",
+      "description": "Register (create or update) and read a customer. Run Register first: the other folders use {{external_id}}.",
+      "item": [
+        {
+          "name": "Register customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.customer.register\",\n    \"biz_content\": {\n      \"external_id\": \"{{external_id}}\",\n      \"name\": \"{{customer_name}}\",\n      \"email\": \"{{customer_email}}\",\n      \"phone\": \"{{customer_phone}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": "Creates the customer at Silver, or updates name / email / phone. `created` tells which."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('code is 0', () => pm.expect(pm.response.json().Response.code).to.eql('0'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Query customer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.customer.query\",\n    \"biz_content\": {\n      \"external_id\": \"{{external_id}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": "Profile, points balance, tier and progress to the next tier."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('code is 0', () => pm.expect(pm.response.json().Response.code).to.eql('0'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Points",
+      "description": "Award and read points. `reference` makes an award idempotent.",
+      "item": [
+        {
+          "name": "Award points (new reference)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.point.create\",\n    \"biz_content\": {\n      \"external_id\": \"{{external_id}}\",\n      \"name\": \"{{customer_name}}\",\n      \"points\": \"{{points}}\",\n      \"reference\": \"ORDER-{{$timestamp}}{{$randomInt}}\",\n      \"note\": \"Postman test order\",\n      \"spent_amount\": \"{{spent_amount}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": "A new reference every time. `spent_amount` (optional) also counts towards the tier. The reference is saved as {{last_reference}}."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('code is 0', () => pm.expect(pm.response.json().Response.code).to.eql('0'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Award again with the same reference (replay)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.point.create\",\n    \"biz_content\": {\n      \"external_id\": \"{{external_id}}\",\n      \"name\": \"{{customer_name}}\",\n      \"points\": \"{{points}}\",\n      \"reference\": \"{{last_reference}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": "Same reference and points as the last award: answers with the first award, `replayed: true`, no extra points."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('code is 0', () => pm.expect(pm.response.json().Response.code).to.eql('0'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Award to an existing customer without name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.point.create\",\n    \"biz_content\": {\n      \"external_id\": \"{{external_id}}\",\n      \"points\": \"10\",\n      \"reference\": \"BONUS-{{$timestamp}}{{$randomInt}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": "Without `name` the customer must already exist; their profile is kept."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('code is 0', () => pm.expect(pm.response.json().Response.code).to.eql('0'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Query points",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.point.query\",\n    \"biz_content\": {\n      \"external_id\": \"{{external_id}}\",\n      \"page\": \"1\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": "Balance, next expiry, points by expiry, last 12 months, one page of history."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('code is 0', () => pm.expect(pm.response.json().Response.code).to.eql('0'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Tiers",
+      "description": "Tier status and history.",
+      "item": [
+        {
+          "name": "Tier status",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.tier.query\",\n    \"biz_content\": {\n      \"external_id\": \"{{external_id}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": "Current tier, guarantee, this cycle's spending, what the next tier needs."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('code is 0', () => pm.expect(pm.response.json().Response.code).to.eql('0'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Tier history",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.tier.history\",\n    \"biz_content\": {\n      \"external_id\": \"{{external_id}}\",\n      \"page\": \"1\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": "Enrolled, upgraded, requalified, protected, demoted; newest first."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('code is 0', () => pm.expect(pm.response.json().Response.code).to.eql('0'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Gift cards",
+      "description": "List → exchange → (verify if the card needs the emailed code) → my gift cards. Create a gift card in Admin → Gift Cards first, and give the customer enough points.",
+      "item": [
+        {
+          "name": "List gift cards",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.giftcard.list\",\n    \"biz_content\": {\n      \"external_id\": \"{{external_id}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": "Sets {{gift_card_id}} to the first card this customer can take."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('code is 0', () => pm.expect(pm.response.json().Response.code).to.eql('0'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Exchange gift card",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.giftcard.exchange\",\n    \"biz_content\": {\n      \"external_id\": \"{{external_id}}\",\n      \"gift_card_id\": \"{{gift_card_id}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": "`issued` (with the code) or `pending` (code emailed: with MAIL_MAILER=log it is in storage/logs). Sets {{exchange_id}}. Fails with NOT_ENOUGH_POINTS, OUT_OF_STOCK, TIER, LIMIT_REACHED, ..."
+          }
+        },
+        {
+          "name": "Verify emailed code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.giftcard.verify\",\n    \"biz_content\": {\n      \"external_id\": \"{{external_id}}\",\n      \"exchange_id\": \"{{exchange_id}}\",\n      \"code\": \"{{giftcard_code}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": "Only for cards with two-step verification (\"requires verification\" on the gift card). The exchange must have answered `pending`; this request is skipped otherwise. {{giftcard_code}} is the 6-digit code emailed to the customer (with MAIL_MAILER=log: in storage/logs). Not the branch code and not the GC-… gift card code."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Skipped unless the last exchange is waiting for the emailed code.",
+                  "if (pm.collectionVariables.get('exchange_status') !== 'pending') {",
+                  "    console.log('Skipped: the last exchange is not pending (the card has no two-step verification, so it was issued at once).');",
+                  "    pm.execution.skipRequest();",
+                  "} else if (!/^\\d{6}$/.test(String(pm.variables.get('giftcard_code') || '').trim())) {",
+                  "    throw new Error('Put the 6-digit code from the email in the giftcard_code variable (see storage/logs/laravel-<today>.log while MAIL_MAILER=log).');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "My gift cards",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.giftcard.exchanges\",\n    \"biz_content\": {\n      \"external_id\": \"{{external_id}}\",\n      \"page\": \"1\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": "Issued and cancelled gift cards."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('code is 0', () => pm.expect(pm.response.json().Response.code).to.eql('0'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Use gift card at a shop",
+      "description": "A customer with an issued gift card goes to a merchant branch; the cashier types the branch's 6-digit code on the customer's phone and the card becomes `used`. Run \"4. Gift cards → Exchange gift card\" first (sets {{exchange_id}}), then List merchants (sets {{branch_id}}), then put that branch's code in {{branch_code}} (Admin → Merchants → the merchant → its branch; needs view-merchantcode).",
+      "item": [
+        {
+          "name": "List merchants",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.merchant.list\",\n    \"biz_content\": {}\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": "Active merchants with their active branches. Sets {{branch_id}} to the first branch. Never branch codes."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('code is 0', () => pm.expect(pm.response.json().Response.code).to.eql('0'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Use gift card at the branch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.giftcard.use\",\n    \"biz_content\": {\n      \"external_id\": \"{{external_id}}\",\n      \"exchange_id\": \"{{exchange_id}}\",\n      \"branch_id\": \"{{branch_id}}\",\n      \"code\": \"{{branch_code}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": "Completes the gift card: status `used`, with used_at, used_at_merchant, used_at_branch. A card with a merchant works only at that merchant's branches (WRONG_SHOP). Errors: WRONG_CODE, TOO_MANY_ATTEMPTS (5 wrong codes → 15 min lock-out), ALREADY_USED, EXPIRED, NOT_ISSUED (pending/cancelled), BRANCH_UNAVAILABLE, EXCHANGE_NOT_FOUND."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^\\d{6}$/.test(String(pm.variables.get('branch_code') || '').trim())) {",
+                  "    throw new Error('Put the branch\\'s 6-digit code in the branch_code variable (Admin → Merchants → the merchant → branch code).');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Use again (retry)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.giftcard.use\",\n    \"biz_content\": {\n      \"external_id\": \"{{external_id}}\",\n      \"exchange_id\": \"{{exchange_id}}\",\n      \"branch_id\": \"{{branch_id}}\",\n      \"code\": \"{{branch_code}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": "Same gift card, same branch: answers the same used card with `replayed: true` (an app retry after a timeout is safe). At another branch it is ALREADY_USED."
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Error cases",
+      "description": "Each request breaks one thing on purpose and checks the error code.",
+      "item": [
+        {
+          "name": "Wrong signature → 401 INVALID_SIGNATURE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.merchant.list\",\n    \"_case\": \"bad_sign\",\n    \"biz_content\": {}\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+                  "pm.test('code is INVALID_SIGNATURE', () => pm.expect(pm.response.json().Response.code).to.eql('INVALID_SIGNATURE'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Old timestamp → 401 TIMESTAMP_EXPIRED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.merchant.list\",\n    \"_case\": \"old_timestamp\",\n    \"biz_content\": {}\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+                  "pm.test('code is TIMESTAMP_EXPIRED', () => pm.expect(pm.response.json().Response.code).to.eql('TIMESTAMP_EXPIRED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reused nonce → 409 DUPLICATE_NONCE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.merchant.list\",\n    \"_case\": \"reuse_nonce\",\n    \"biz_content\": {}\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": "Sends the nonce of the last request that got past the signature check again. Run any successful request first (within 5 minutes)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 409', () => pm.response.to.have.status(409));",
+                  "pm.test('code is DUPLICATE_NONCE', () => pm.expect(pm.response.json().Response.code).to.eql('DUPLICATE_NONCE'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown appid → 401 INVALID_APPID",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.merchant.list\",\n    \"_case\": \"bad_appid\",\n    \"biz_content\": {}\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+                  "pm.test('code is INVALID_APPID', () => pm.expect(pm.response.json().Response.code).to.eql('INVALID_APPID'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown method → 400 UNKNOWN_METHOD",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.nothing.here\",\n    \"biz_content\": {}\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('code is UNKNOWN_METHOD', () => pm.expect(pm.response.json().Response.code).to.eql('UNKNOWN_METHOD'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid biz_content → 422 VALIDATION_FAILED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.point.create\",\n    \"biz_content\": {\n      \"external_id\": \"{{external_id}}\",\n      \"points\": \"0\",\n      \"email\": \"not-an-email\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": "`errors` lists points, reference and email."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 422', () => pm.response.to.have.status(422));",
+                  "pm.test('code is VALIDATION_FAILED', () => pm.expect(pm.response.json().Response.code).to.eql('VALIDATION_FAILED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Unknown customer → 404 CUSTOMER_NOT_FOUND",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.customer.query\",\n    \"biz_content\": {\n      \"external_id\": \"nobody-{{$timestamp}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+                  "pm.test('code is CUSTOMER_NOT_FOUND', () => pm.expect(pm.response.json().Response.code).to.eql('CUSTOMER_NOT_FOUND'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Same reference, other points → 409 REFERENCE_CONFLICT",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Request\": {\n    \"method\": \"pos.point.create\",\n    \"biz_content\": {\n      \"external_id\": \"{{external_id}}\",\n      \"points\": \"999\",\n      \"reference\": \"{{last_reference}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/gateway",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "gateway"
+              ]
+            },
+            "description": "Run \"Award points (new reference)\" first."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 409', () => pm.response.to.have.status(409));",
+                  "pm.test('code is REFERENCE_CONFLICT', () => pm.expect(pm.response.json().Response.code).to.eql('REFERENCE_CONFLICT'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "external_id",
+      "value": "postman-1"
+    },
+    {
+      "key": "customer_name",
+      "value": "Postman Tester"
+    },
+    {
+      "key": "customer_email",
+      "value": "postman@example.com"
+    },
+    {
+      "key": "customer_phone",
+      "value": "09123456789"
+    },
+    {
+      "key": "points",
+      "value": "250"
+    },
+    {
+      "key": "spent_amount",
+      "value": "250000"
+    },
+    {
+      "key": "gift_card_id",
+      "value": ""
+    },
+    {
+      "key": "exchange_id",
+      "value": ""
+    },
+    {
+      "key": "exchange_status",
+      "value": ""
+    },
+    {
+      "key": "giftcard_code",
+      "value": ""
+    },
+    {
+      "key": "branch_id",
+      "value": ""
+    },
+    {
+      "key": "branch_code",
+      "value": ""
+    },
+    {
+      "key": "last_reference",
+      "value": ""
+    },
+    {
+      "key": "last_nonce",
+      "value": ""
+    },
+    {
+      "key": "last_used_nonce",
+      "value": ""
+    },
+    {
+      "key": "last_string_to_sign",
+      "value": ""
+    }
+  ]
+}

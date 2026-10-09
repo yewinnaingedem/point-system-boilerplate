@@ -27,6 +27,7 @@ class User extends Authenticatable
         'name',
         'email',
         'phone',
+        'merchant_id',
         'avatar',
         'is_active',
         'password',
@@ -53,6 +54,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'is_active' => 'boolean',
+            'merchant_id' => 'integer',
             'password' => 'hashed',
         ];
     }
@@ -76,6 +78,12 @@ class User extends Authenticatable
                 ->orWhere('email', 'like', "{$term}%")
                 ->orWhere('phone', 'like', "{$term}%");
         });
+    }
+
+    /** A merchant's own staff (e.g. KFC manager): sees only that merchant's pages and claims. */
+    public function isMerchantUser(): bool
+    {
+        return $this->merchant_id !== null;
     }
 
     public function isAdministrator(): bool

@@ -9,7 +9,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
-use Laravel\Sanctum\PersonalAccessToken;
+use Modules\Api\Models\ApiClient;
 use Modules\Api\Services\ApiTokenService;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 
@@ -68,16 +68,15 @@ class ApiServiceProvider extends ModuleServiceProvider
 
         $this->configureRateLimiting();
 
-        // Admin token screen binds {token} to Sanctum's model.
-        $this->app['router']->model('token', PersonalAccessToken::class);
+        $this->app['router']->model('client', ApiClient::class);
 
         $this->app->make(MenuRegistry::class)->add(new MenuItem(
-            label: 'API Tokens',
-            route: 'admin.api-tokens.index',
-            icon: 'fas fa-plug',
-            section: 'Administration',
-            permission: 'view-apitoken',
-            order: 85,
+            label: 'API Clients',
+            route: 'admin.api-clients.index',
+            icon: 'fas fa-key',
+            section: 'Management',
+            permission: 'view-apiclient',
+            order: 86,
         ));
     }
 

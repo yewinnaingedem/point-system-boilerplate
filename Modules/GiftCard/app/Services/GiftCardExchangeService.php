@@ -17,6 +17,8 @@ use Modules\Loyalty\Exceptions\InsufficientPoints;
 use Modules\Loyalty\Models\PointTransaction;
 use Modules\Loyalty\Services\PointWallet;
 use Modules\Loyalty\Services\TierQualificationEngine;
+use Modules\Merchant\Exceptions\RedemptionRejected;
+use Modules\Merchant\Services\BranchCodeVerifier;
 
 /**
  * Customers exchange points for gift cards.
@@ -26,6 +28,10 @@ use Modules\Loyalty\Services\TierQualificationEngine;
  * code (stored only as a hash) and take nothing until it is confirmed; then every check runs
  * again. Issuing happens in one transaction that locks the gift card row (SELECT ... FOR UPDATE),
  * so stock and limits hold under concurrent exchanges, and the points debit joins it.
+ *
+ * An issued card is then completed at a merchant branch (useAtBranch): shop staff type the
+ * branch's 6-digit code on the customer's app, the card becomes `used`, and its value is owed
+ * to that merchant. A card that belongs to a merchant works only at that merchant's branches.
  */
 class GiftCardExchangeService
 {
@@ -35,6 +41,7 @@ class GiftCardExchangeService
         private readonly ConnectionInterface $db,
         private readonly PointWallet $wallet,
         private readonly TierQualificationEngine $tiers,
+        private readonly BranchCodeVerifier $branchCodes,
     ) {}
 
     /**
@@ -120,13 +127,82 @@ class GiftCardExchangeService
         return $this->issue($customer, $exchange->giftCard, $exchange);
     }
 
+    /**
+     * Complete an issued gift card at a branch. The points were taken when it was issued; this
+     * records where it was used and what is owed to the merchant (the card's value).
+     *
+     * Sending the same use again (an app retry after a timeout) returns it unchanged, as long as
+     * it is the same branch.
+     *
+     * @throws ExchangeRejected not_issued, already_used, expired, branch_unavailable, wrong_shop, wrong_code, too_many_attempts
+     */
+    public function useAtBranch(Customer $customer, GiftCardExchange $exchange, int $branchId, string $code): GiftCardExchange
+    {
+        if ($exchange->customer_id !== $customer->id) {
+            throw new ExchangeRejected(__('This gift card belongs to another customer.'), 'not_issued');
+        }
+        if ($exchange->status === ExchangeStatus::Used && $exchange->branch_id === $branchId) {
+            return $exchange; // retry of the same use
+        }
+        $this->checkUsable($exchange);
+
+        try {
+            $branch = $this->branchCodes->availableBranch($branchId);
+            // Before the code, so trying the wrong shop never uses up the customer's code attempts.
+            $card = $exchange->giftCard()->with('merchant:id,name')->first();
+            if (! $card->usableAtMerchant($branch->merchant_id)) {
+                throw new ExchangeRejected(__('This gift card can only be used at :merchant.', ['merchant' => $card->merchant->name]), 'wrong_shop');
+            }
+            $this->branchCodes->verify($customer, $branch, $code);
+        } catch (RedemptionRejected $e) {
+            throw new ExchangeRejected($e->getMessage(), match (true) {
+                $e->retryAfter !== null => 'too_many_attempts',
+                $e->field === 'code' => 'wrong_code',
+                default => 'branch_unavailable',
+            });
+        }
+
+        return $this->db->transaction(function () use ($exchange, $branch) {
+            $locked = GiftCardExchange::query()->whereKey($exchange->id)->lockForUpdate()->firstOrFail();
+            if ($locked->status === ExchangeStatus::Used && $locked->branch_id === $branch->id) {
+                return $locked; // the same use arrived twice at once
+            }
+            $this->checkUsable($locked);
+
+            $locked->update([
+                'status' => ExchangeStatus::Used,
+                'used_at' => now(),
+                'merchant_id' => $branch->merchant_id,
+                'branch_id' => $branch->id,
+                'payout_amount' => $locked->face_value,
+            ]);
+
+            return $locked;
+        });
+    }
+
+    /** @throws ExchangeRejected */
+    private function checkUsable(GiftCardExchange $exchange): void
+    {
+        if ($exchange->status === ExchangeStatus::Used) {
+            throw new ExchangeRejected(__('This gift card was already used.'), 'already_used');
+        }
+        if ($exchange->status !== ExchangeStatus::Issued) {
+            throw new ExchangeRejected(__('This gift card can\'t be used (it is :status).', ['status' => __($exchange->status->label())]), 'not_issued');
+        }
+        if ($exchange->expires_at?->isPast()) {
+            throw new ExchangeRejected(__('This gift card expired on :date.', ['date' => $exchange->expires_at->format(setting('date_format'))]), 'expired');
+        }
+    }
+
     /** Staff cancel an issued card: its points go back (original lots) and its stock is returned. */
     public function cancel(GiftCardExchange $exchange, User $actor, string $reason): GiftCardExchange
     {
         return $this->db->transaction(function () use ($exchange, $actor, $reason) {
             $locked = GiftCardExchange::query()->whereKey($exchange->id)->lockForUpdate()->firstOrFail();
             if ($locked->status !== ExchangeStatus::Issued) {
-                throw new ExchangeRejected(__('Only issued gift cards can be cancelled.'), 'not_issued');
+                // A used card can't be refunded: the shop already handed over the goods.
+                throw new ExchangeRejected(__('Only issued gift cards that were not used can be cancelled.'), 'not_issued');
             }
 
             $debit = PointTransaction::query()->where('source_type', $locked->getMorphClass())->where('source_id', $locked->id)

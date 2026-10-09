@@ -6,19 +6,33 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Modules\Dashboard\Services\DashboardStats;
+use Modules\Dashboard\Support\ModuleCards;
 
+/** Landing page for everyone: a welcome, a card per module the user may open, recent sign-ins. */
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request, DashboardStats $stats): View
+    public function __invoke(Request $request, DashboardStats $stats, ModuleCards $cards): View
     {
-        $canSeeOverview = $request->user()->can('view-dashboard');
+        $user = $request->user();
+        $canSeeOverview = $user->can('view-dashboard');
 
         return view('dashboard::index', [
+            'user' => $user,
+            'greeting' => $this->greeting((int) now()->format('G')),
+            'role' => $user->roles->pluck('name')->first(),
+            'merchantName' => $user->merchant_id ? $stats->merchantName($user->merchant_id) : null,
+            'sections' => $cards->for($user),
             'canSeeOverview' => $canSeeOverview,
-            'totals' => $canSeeOverview ? $stats->totals() : null,
             'recentLogins' => $canSeeOverview ? $stats->recentLogins() : collect(),
-            'usersPerRole' => $canSeeOverview ? $stats->usersPerRole() : collect(),
-            'modules' => $canSeeOverview ? $stats->enabledModules() : [],
         ]);
+    }
+
+    private function greeting(int $hour): string
+    {
+        return match (true) {
+            $hour < 12 => __('Good morning'),
+            $hour < 17 => __('Good afternoon'),
+            default => __('Good evening'),
+        };
     }
 }

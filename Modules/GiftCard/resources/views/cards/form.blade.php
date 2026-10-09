@@ -43,6 +43,17 @@
                     <div class="card-header"><h3 class="card-title"><i class="fas fa-sliders-h mr-1"></i> {{ __('Rules') }}</h3></div>
                     <div class="card-body">
                         <div class="form-group">
+                            <label for="merchant_id">{{ __('Merchant') }}</label>
+                            <select id="merchant_id" name="merchant_id" @class(['custom-select', 'is-invalid' => $errors->has('merchant_id')])>
+                                <option value="">{{ __('Any partner shop') }}</option>
+                                @foreach ($merchants as $id => $merchantName)
+                                    <option value="{{ $id }}" @selected((string) old('merchant_id', $card->merchant_id) === (string) $id)>{{ $merchantName }}</option>
+                                @endforeach
+                            </select>
+                            @error('merchant_id') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                            <small class="form-text text-muted">{{ __('Only this merchant\'s branches can accept the card, and only this merchant claims it.') }}</small>
+                        </div>
+                        <div class="form-group">
                             <label for="min_tier">{{ __('Tier') }}</label>
                             <select id="min_tier" name="min_tier" @class(['custom-select', 'is-invalid' => $errors->has('min_tier')])>
                                 <option value="">{{ __('Every tier') }}</option>

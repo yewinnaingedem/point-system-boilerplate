@@ -35,15 +35,18 @@
                                 <textarea id="address" name="address" rows="2" maxlength="500" @class(['form-control', 'is-invalid' => $errors->has('address')])>{{ old('address', $merchant->address) }}</textarea>
                                 @error('address') <span class="invalid-feedback">{{ $message }}</span> @enderror
                             </div>
-                            <div class="form-group col-12 mb-0">
-                                <label for="notes">{{ __('Notes') }}</label>
-                                <textarea id="notes" name="notes" rows="2" maxlength="2000" @class(['form-control', 'is-invalid' => $errors->has('notes')])>{{ old('notes', $merchant->notes) }}</textarea>
-                                @error('notes') <span class="invalid-feedback">{{ $message }}</span> @enderror
-                            </div>
+                            @unless (auth()->user()->isMerchantUser())
+                                <div class="form-group col-12 mb-0">
+                                    <label for="notes">{{ __('Notes') }}</label>
+                                    <textarea id="notes" name="notes" rows="2" maxlength="2000" @class(['form-control', 'is-invalid' => $errors->has('notes')])>{{ old('notes', $merchant->notes) }}</textarea>
+                                    @error('notes') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                                </div>
+                            @endunless
                         </div>
                     </div>
                 </div>
             </div>
+            @unless (auth()->user()->isMerchantUser())
             <div class="col-lg-4">
                 <div class="card card-secondary card-outline">
                     <div class="card-header"><h3 class="card-title"><i class="fas fa-hand-holding-usd mr-1"></i> {{ __('Payout') }}</h3></div>
@@ -63,6 +66,7 @@
                     </div>
                 </div>
             </div>
+            @endunless
         </div>
         <div class="mb-4">
             <a href="{{ $editing ? route('admin.merchants.show', $merchant) : route('admin.merchants.index') }}" class="btn btn-secondary">{{ __('Cancel') }}</a>

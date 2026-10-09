@@ -3,7 +3,6 @@
 namespace Modules\Access\Providers;
 
 use App\Models\User;
-use App\Support\Menu\MenuGroup;
 use App\Support\Menu\MenuItem;
 use App\Support\Menu\MenuRegistry;
 use Illuminate\Console\Scheduling\Schedule;
@@ -95,10 +94,10 @@ class AccessServiceProvider extends ModuleServiceProvider
             $view->with('impersonatorName', $impersonation->isImpersonating($session) ? $impersonation->impersonatorName($session) : null);
         });
 
+        // Sidebar section "Access Management": Roles, Users, (Customers, from the Customer module), Permissions.
         $this->app->make(MenuRegistry::class)
-            ->addGroup(new MenuGroup('access', 'Access Management', 'fas fa-user-lock', 'Administration', 10))
-            ->add(new MenuItem('Users', 'admin.access.users.index', 'fas fa-users', permission: 'view-user', order: 10, parent: 'access'))
-            ->add(new MenuItem('Roles', 'admin.access.roles.index', 'fas fa-user-shield', permission: 'view-role', order: 20, parent: 'access'))
-            ->add(new MenuItem('Permissions', 'admin.access.permissions.index', 'fas fa-key', permission: 'view-permission', order: 30, parent: 'access'));
+            ->add(new MenuItem('Roles', 'admin.access.roles.index', 'fas fa-user-shield', 'Access Management', 'view-role', 10))
+            ->add(new MenuItem('Users', 'admin.access.users.index', 'fas fa-users', 'Access Management', 'view-user', 20))
+            ->add(new MenuItem('Permissions', 'admin.access.permissions.index', 'fas fa-key', 'Access Management', 'view-permission', 40));
     }
 }

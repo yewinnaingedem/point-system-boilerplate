@@ -9,11 +9,13 @@ use Modules\Customer\Models\Customer;
 use Modules\Loyalty\Enums\PointTransactionType;
 use Modules\Loyalty\Services\PointWallet;
 use Modules\Merchant\Enums\RedemptionStatus;
+use Modules\Merchant\Exceptions\RedemptionRejected;
 use Modules\Merchant\Models\Merchant;
 use Modules\Merchant\Models\MerchantBranch;
 use Modules\Merchant\Models\MerchantReward;
 use Modules\Merchant\Models\Redemption;
 use Modules\Merchant\Services\MerchantService;
+use Modules\Merchant\Services\RedemptionService;
 use Tests\TestCase;
 
 /**
@@ -130,51 +132,32 @@ class RedemptionTest extends TestCase
         $this->assertSame(2500, $this->wallet->balance($this->member->id));
     }
 
-    public function test_admin_reverses_an_unsettled_redemption(): void
+    public function test_an_unsettled_redemption_can_be_reversed_once(): void
     {
+        // The admin Redemptions screen was removed (2026-10-09); the service rule stays.
         $this->redeem($this->zinger)->assertCreated();
         $redemption = Redemption::query()->sole();
         $admin = $this->userWithRole(SystemRole::Administrator);
+        $service = app(RedemptionService::class);
 
-        $this->actingAs($admin)->get(route('admin.redemptions.reverse.create', $redemption))->assertOk();
-        $this->actingAs($admin)->post(route('admin.redemptions.reverse.store', $redemption), ['reason' => 'Out of stock'])
-            ->assertRedirect(route('admin.redemptions.index'))->assertSessionHas('success');
-
+        $service->reverse($redemption, $admin, 'Out of stock');
         $this->assertSame(RedemptionStatus::Reversed, $redemption->fresh()->status);
         $this->assertSame(3000, $this->wallet->balance($this->member->id));
         $this->assertSame(0, Redemption::query()->unsettled()->count());
 
         // Not twice, and never once it is in a settlement.
-        $this->actingAs($admin)->post(route('admin.redemptions.reverse.store', $redemption), ['reason' => 'again'])->assertSessionHas('error');
+        $this->assertThrows(fn () => $service->reverse($redemption->fresh(), $admin, 'again'), RedemptionRejected::class);
         $this->assertSame(3000, $this->wallet->balance($this->member->id));
 
-        Sanctum::actingAs($this->member);
         $this->redeem($this->zinger)->assertCreated();
         $settled = Redemption::query()->latest('id')->first();
         $settled->update(['settlement_id' => 1]);
-        $this->actingAs($admin)->post(route('admin.redemptions.reverse.store', $settled), ['reason' => 'late'])->assertSessionHas('error');
+        $this->assertThrows(fn () => $service->reverse($settled->fresh(), $admin, 'late'), RedemptionRejected::class);
     }
 
-    public function test_admin_redemptions_table_filters_by_merchant_and_settlement(): void
+    public function test_the_admin_redemptions_screen_is_gone(): void
     {
-        $this->redeem($this->zinger)->assertCreated();
-        $columns = ['reference', 'date', 'member', 'shop', 'reward', 'points', 'payout', 'status', 'actions'];
-        $admin = $this->userWithRole(SystemRole::Administrator);
-        $this->actingAs($admin);
-
-        $this->dataTable(route('admin.redemptions.data'), $columns, ['merchant_id' => $this->kfc->id, 'settlement' => 'unsettled'])
-            ->assertJsonPath('recordsFiltered', 1)->assertJsonPath('data.0.reward', 'Zinger Burger');
-        $this->dataTable(route('admin.redemptions.data'), $columns, ['settlement' => 'settled'])->assertJsonPath('recordsFiltered', 0);
-
-        // Sorting by points works (an addColumn() of the same name would silently disable it).
-        Sanctum::actingAs($this->member);
-        $this->redeem($this->bucket)->assertCreated();
-        $this->actingAs($admin);
-        $sortable = array_map(fn ($c) => ['data' => $c, 'name' => $c === 'points' ? 'points' : '', 'orderable' => $c === 'points' ? 'true' : 'false'], $columns);
-        foreach (['asc' => ['500', '2,000'], 'desc' => ['2,000', '500']] as $dir => $expected) {
-            $rows = $this->dataTable(route('admin.redemptions.data'), [], ['columns' => $sortable, 'order' => [['column' => 5, 'dir' => $dir]]])->json('data');
-            $this->assertSame($expected, array_column($rows, 'points'), $dir);
-        }
+        $this->actingAs($this->userWithRole(SystemRole::Administrator))->get('/admin/redemptions')->assertNotFound();
     }
 
     public function test_merchant_list_for_the_app_hides_codes_and_inactive_items(): void

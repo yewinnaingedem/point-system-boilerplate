@@ -162,6 +162,7 @@ final class UserService
             'name' => $data['name'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
+            'merchant_id' => $data['merchant_id'] ?? null,
             'is_active' => (bool) ($data['is_active'] ?? false),
         ];
     }

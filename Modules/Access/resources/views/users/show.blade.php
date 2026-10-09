@@ -147,11 +147,6 @@
                                     @endforelse
                                 </tbody>
                             </table>
-                            @if ($tokens->isNotEmpty() && Route::has('admin.api-tokens.index'))
-                                @can('view-apitoken')
-                                    <a href="{{ route('admin.api-tokens.index', ['search' => $user->email]) }}" class="btn btn-sm btn-default mt-3"><i class="fas fa-plug mr-1"></i>{{ __('Manage on API Tokens') }}</a>
-                                @endcan
-                            @endif
                         </div>
                     </div>
                 </div>

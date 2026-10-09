@@ -21,7 +21,7 @@ class ExchangesTable
     {
         $search = $request->searchTerm();
         $query = GiftCardExchange::query()->select('gift_card_exchanges.*')
-            ->with(['customer:id,name,email,phone', 'giftCard:id,name'])
+            ->with(['customer:id,name,email,phone', 'giftCard:id,name', 'merchant:id,name', 'branch:id,name'])
             ->when($request->validated('status'), fn (Builder $q, $status) => $q->where('status', $status))
             ->when($request->validated('gift_card_id'), fn (Builder $q, $id) => $q->where('gift_card_id', $id));
 

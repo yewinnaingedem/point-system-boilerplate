@@ -10,11 +10,9 @@ use Modules\Merchant\Exceptions\MerchantInUse;
 use Modules\Merchant\Http\Requests\MerchantRequest;
 use Modules\Merchant\Http\Requests\MerchantTableRequest;
 use Modules\Merchant\Models\Merchant;
-use Modules\Merchant\Models\Redemption;
 use Modules\Merchant\Services\MerchantService;
 use Modules\Merchant\Tables\BranchesTable;
 use Modules\Merchant\Tables\MerchantsTable;
-use Modules\Merchant\Tables\RewardsTable;
 
 class MerchantController extends Controller
 {
@@ -40,18 +38,12 @@ class MerchantController extends Controller
         $merchant = $this->merchants->saveMerchant(new Merchant, $request->validated());
 
         return redirect()->route('admin.merchants.show', $merchant)
-            ->with('success', __('Merchant :name created. Add its branches and rewards next.', ['name' => $merchant->name]));
+            ->with('success', __('Merchant :name created. Add its branches next.', ['name' => $merchant->name]));
     }
 
     public function show(Merchant $merchant): View
     {
-        $unsettled = Redemption::query()->unsettled()->where('merchant_id', $merchant->id);
-
-        return view('merchant::merchants.show', [
-            'merchant' => $merchant,
-            'unsettledTotal' => (string) (clone $unsettled)->sum('payout_amount'),
-            'unsettledCount' => (clone $unsettled)->count(),
-        ]);
+        return view('merchant::merchants.show', ['merchant' => $merchant]);
     }
 
     public function edit(Merchant $merchant): View
@@ -78,11 +70,6 @@ class MerchantController extends Controller
     }
 
     public function branches(MerchantTableRequest $request, Merchant $merchant, BranchesTable $table): JsonResponse
-    {
-        return $table->response($request, $merchant);
-    }
-
-    public function rewards(MerchantTableRequest $request, Merchant $merchant, RewardsTable $table): JsonResponse
     {
         return $table->response($request, $merchant);
     }

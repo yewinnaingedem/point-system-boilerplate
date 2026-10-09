@@ -15,8 +15,11 @@ use Illuminate\Support\Collection;
  */
 final class MenuRegistry
 {
-    /** Order in which sidebar sections appear; unknown sections go last. */
-    private const SECTION_ORDER = ['Main', 'Sales', 'Inventory', 'Reports', 'Administration'];
+    /**
+     * Order in which sidebar sections appear; unknown sections go last. "Main" (Dashboard) has no
+     * header; the others are the section headers.
+     */
+    private const SECTION_ORDER = ['Main', 'Access Management', 'Management', 'Inventory', 'Reports', 'Log Management'];
 
     /** @var list<MenuItem> */
     private array $items = [];

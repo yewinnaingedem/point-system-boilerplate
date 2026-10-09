@@ -52,9 +52,14 @@ resources/js/app.js              jQuery global → Bootstrap → AdminLTE, then 
   ui/dark-mode.js, ui/confirm-delete.js,
   ui/forms.js (file input label, password eye, toggle-all, colour sync, autosubmit, form[data-confirm]),
   ui/datatables.js (lazy-loads DataTables only on pages with <x-datatable>), ui/toasts.js,
-  ui/ui-state.js (remembers sidebar collapsed / open groups / collapsed cards in localStorage)
+  ui/ui-state.js (remembers sidebar collapsed / collapsed cards in localStorage; one sidebar group open at a time),
+  ui/select.js (every content <select> becomes a searchable Select2 box, lazy-loaded; opt out with data-native;
+  data-search-url = search the server as you type, e.g. the customer picker)
 docs/customer-sso.md             how the partner project signs customers in (with its code)
 docs/partner-api.md              how the partner project awards points (with its code)
+docs/gateway-api.md              signed gateway: envelope, signing, every method, error codes, partner code
+docs/api-development-guide.md    for developers: how the gateway is built, adding a method, rules, tests, checklist
+docs/postman/                    Postman collection (signs requests itself) + local environment for the gateway
 docs/diagrams/pos-system-map.tldraw   module map and flows (tldraw offline)
 ```
 
@@ -65,16 +70,18 @@ docs/diagrams/pos-system-map.tldraw   module map and flows (tldraw offline)
 | Dashboard | `/admin/dashboard`, landing page for everyone. Overview widgets need `view-dashboard`. |
 | Access | Staff users: DataTable list with All / Active / Deactivated / Deleted tabs, view page (effective permissions, browser sessions, app devices), create/edit, change password, clear sessions, activate/deactivate, **Login as** (`impersonate-user`), soft delete → restore / delete permanently. Roles (permission matrix), permissions (read-only list). |
 | AppSetting | Settings stored in the `settings` table, edited at `/admin/settings/{group}` (tabs incl. **Loyalty**: tier cycle length, point expiry months and cutoff day). |
-| Api | Token API at `/api/v1` (Sanctum): staff routes for the POS app, plus the route groups other modules add (customer API). Admin **API Tokens** screen (`view/delete-apitoken`). See "API". |
+| Api | Token API at `/api/v1` (Sanctum): staff routes for the POS app, plus the route groups other modules add (customer API). Staff app devices show on the user's page (the API Tokens screen was removed 2026-10-09). **Signed gateway** `POST /api/v1/gateway` (KBZPay-style envelope) + **API Clients** screen (`apiclient` CRUD). See "API" and "Gateway". |
 | LogViewer | `/admin/logs`: **daily logs only** (`laravel-YYYY-MM-DD.log`, one row per day with per-level counts). Click a day for its entries: level filter, search, stack traces; download / delete. `view/download/delete-logviewer` (Administrator only). Reads at most the newest `LOG_VIEWER_MAX_BYTES` (5 MB). |
 | Customer | **Customers**: created/updated by sign-in from the partner Laravel project (JWT SSO). Start at Silver, have a tier history, points and redemptions. Admin **Customers** screen (`view/edit-customer`), customer API `/api/v1/customer/*`. See "Customers". |
 | Loyalty | Tiers Silver → Gold → Platinum → Diamond: qualification engine, guarantee, cycles, tier config screen (**Loyalty → Tiers**, `view/edit-loyaltytier`), and the **points wallet** with expiring point lots and a monthly summary (**Loyalty → Customer Points / Points Summary**, `view/adjust-point`). See "Loyalty". |
 | Partner | Server-to-server API for the partner project: **award points** (`POST /api/v1/partner/points`, idempotent by `reference`, optional tier spending) and read a customer's points. `PARTNER_API_KEY` bearer key. See "Partner API". |
 | GiftCard | **Gift cards** customers exchange points for: tier restriction (min tier), stock (out of stock at 0), max per customer, validity days, optional **two-step** (emailed 6-digit code). Admin **Gift Cards** + **Exchanges** (cancel = refund + restock). Customer API `/api/v1/customer/gift-cards*`. See "Gift cards". |
-| Merchant | Partners where customers **spend** points (e.g. KFC; merchants never award points): merchant → branches (each with a 6-digit code) → rewards. **Redemptions** screen with reversal. `merchant:demo-data`. See "Merchants & redemptions". |
+| Merchant | Partners where customers **spend** points (e.g. KFC; merchants never award points): merchant → branches (each with a 6-digit code) → rewards. The admin **Redemptions** screen and **Rewards table were removed** (2026-10-09: the app spends points on gift cards only); rewards still exist in the DB, API and demo data. `merchant:demo-data`. See "Merchants & redemptions". |
 
-Sidebar: **Main** (Dashboard) · **Sales** (Customers, Loyalty ▸ Tiers / Customer Points / Points Activity / Points Summary, Merchants ▸ Merchants / Redemptions, Gift Cards ▸ Gift Cards / Exchanges)
-· **Administration** (Access Management ▸ Users / Roles / Permissions, API Tokens, Settings, Logs).
+Sidebar (2026-10-09): **Dashboard**, **Settings** (top, no header) · **Access Management** (Roles, Users, Customers, Permissions) ·
+**Management** (Loyalty Tiers, Points ▸ Earned Points / Customer Points / Points Activity / Points Summary, Merchants ▸ Merchants / Claims,
+Gift Cards ▸ Gift Cards / Exchanges, API Clients) · **Log Management** (Logs). Child links are indented; opening a
+group closes the others; only the current page's group is open on load.
 
 ### Adding a module
 
@@ -96,12 +103,14 @@ Then, following Access/AppSetting (the skill has the full recipe):
 4. Sidebar: in the provider's `boot()`,
    `$this->app->make(MenuRegistry::class)->add(new MenuItem('Products', 'admin.products.index', 'fas fa-box', 'Inventory', 'view-product'))`.
    Several related links? Register a collapsible group and point the items at it:
-   `->addGroup(new MenuGroup('inventory', 'Inventory', 'fas fa-boxes', 'Inventory', 10))` then
+   `->addGroup(new MenuGroup('inventory', 'Inventory', 'fas fa-boxes', 'Management', 10))` then
    `new MenuItem(..., permission: 'view-product', order: 10, parent: 'inventory')`. A group shows only
    if the user can see one of its items and opens itself on their pages.
-   Sections: Main, Sales, Inventory, Reports, Administration (each is its own `<ul>` with a divider).
+   Sections: Main (Dashboard, Settings; no header), Access Management, Management, Inventory, Reports, Log Management (each is its own
+   `<ul>` with a divider; order in `MenuRegistry::SECTION_ORDER`).
 5. Lists that grow: server-side DataTable (see "Lists"). Views: `<x-layouts.admin :title="..." :breadcrumbs="[...]">`
-   and plain AdminLTE markup: `card card-primary card-outline`, `info-box`, `custom-control` switches,
+   and plain AdminLTE markup: `card card-primary card-outline`, `info-box`, `custom-control` switches, plain `<select class="custom-select">`
+   (turned into a searchable dropdown automatically; `data-native` keeps it native),
    `btn btn-sm`. Copy from the Access / Merchant views. Delete buttons:
    `<x-confirm-delete :action="route(...)" :title="..." />` (shared modal); other risky buttons:
    `<form data-confirm="Sure?">`. A collapsible card that should stay collapsed: `data-remember-card="module.key"`.
@@ -154,7 +163,7 @@ Packages: `yajra/laravel-datatables-oracle` + `datatables.net-bs4` / `-responsiv
 - Starting grants (`RoleSeeder`): Manager → dashboard, view/create/edit users, view settings;
   Cashier → dashboard. They are applied only when the role is first created, so re-seeding
   never overwrites changes made in the UI. New module permissions (customer, loyaltytier, point,
-  merchant, merchantcode, redemption, giftcard, giftcardexchange) start with Administrator only: grant them on the Roles screen.
+  merchant, merchantcode, giftcard, giftcardexchange (view/create/cancel), merchantclaim, apiclient) start with Administrator only: grant them on the Roles screen.
 
 ## Settings
 
@@ -183,6 +192,10 @@ Packages: `yajra/laravel-datatables-oracle` + `datatables.net-bs4` / `-responsiv
 - `Customer` implements `Authenticatable` (Sanctum's guard requires it) but has no password.
 - Sanctum resolves any token owner, so routes check the kind: `EnsureStaffToken` on staff API routes,
   `EnsureCustomerToken` on `/api/v1/customer/*` (403 for the wrong kind). Rate-limit keys are `User:5` / `Customer:5`.
+- **Customer picker** `@include('customer::partials.select', ['name' => 'customer_id', 'selected' => $customer])`: searches
+  `GET admin/customers/search` (name / email / phone prefix or customer id; tier + points; 20 per page; for `view-customer`,
+  `adjust-point` or `create-giftcardexchange`) and posts the exact `customer_id`. Used by Adjust points and Exchange for a
+  customer, which no longer accept a typed email / phone. Load the chosen customer `with(['pointAccount', 'tierStatus'])`.
 - Admin **Customers**: list (tier badge, points, last sign-in; filter by tier/status), customer page (tier +
   progress to the next tier, tier history, signed-in devices). **Deactivate** revokes all their tokens;
   their next request is 401 and SSO is refused.
@@ -218,13 +231,23 @@ Packages: `yajra/laravel-datatables-oracle` + `datatables.net-bs4` / `-responsiv
 - **Monthly summary** `loyalty_point_summaries` (customer × month: earned, redeemed, reversed, adjusted_in/out,
   expired), written in the same transaction as each ledger row. `PointStatement::for($customerId)` (balance,
   next expiry, by expiry, last 12 months) feeds the customer API, partner API and admin pages.
-- Admin: **Customer Points** (balances, history, points by expiry, month by month, adjust by email/phone),
+- Admin, sidebar group **Points**: **Earned Points** (every customer's credits = lots: points, left, status unused / partly used /
+  used up / expired, expiry; filters period (default this month), source awarded/manual, status, expiring in 30 days,
+  customer name/email/phone/id or order reference; `EarnedPointStatus`, index on `loyalty_point_lots.earned_at`),
+  **Customer Points** (balances, history, points by expiry, month by month, adjust by email/phone),
   **Points Activity** (all customers' movements by period / type / customer or reference; "customers who earned"
   grouped per customer; today's earned / earners / redeemed / expired) and **Points Summary** (outstanding,
   expiring this/next month, all-customer month table, expiring soon).
 - Tiers, points and redemptions belong to **customers** (`customer_id`), never to staff `users`.
 
 ## Merchants & redemptions (`Modules/Merchant`)
+
+- **No Redemptions screen since 2026-10-09** (menu, list, reverse page, `view/reverse-redemption` permissions removed; the
+  merchant page's "owed" box links to the gift card claim instead). `Redemption`, `RedemptionService::reverse` and the
+  data stay; reward redemption is only left in the customer token API.
+- **No reward admin since 2026-10-09:** the merchant page has no Rewards table and there are no reward create/edit routes.
+  `merchant_rewards`, `MerchantReward`, `MerchantService::saveReward` (demo data, perf:seed, tests) and the redemption
+  API are unchanged. To bring the screen back, restore `RewardController`, `RewardsTable`, `RewardRequest` and the views from git.
 
 - Flow: customer picks a branch + reward in the app → shop staff type the **branch's 6-digit code** on the
   customer's phone → `RedemptionService::redeem()` checks availability, lock-out, code, then in one transaction
@@ -247,6 +270,30 @@ Packages: `yajra/laravel-datatables-oracle` + `datatables.net-bs4` / `-responsiv
 
 ## Gift cards (`Modules/GiftCard`)
 
+- **Used at a branch** (2026-10-09): issued → `used` by `GiftCardExchangeService::useAtBranch()` (gateway `pos.giftcard.use`):
+  shop staff type the **branch's** 6-digit code on the customer's app (`Merchant\Services\BranchCodeVerifier`, same lock-out
+  as redemptions). Row lock on the exchange (MySQL: 10 branches racing for one card → exactly 1). Writes used_at,
+  merchant_id, branch_id, `payout_amount` = face value (owed to that merchant), `settlement_id` null. A used card counts
+  for stock and the per-customer limit, can't be cancelled, and the same branch again is a replay. Any branch can complete any card.
+  **For settlement:** used exchanges with `settlement_id IS NULL` (index `merchant_id, status, settlement_id`) are owed too.
+- **Gift card → merchant** (2026-10-09): `gift_cards.merchant_id` (optional; empty = any partner shop). `useAtBranch` refuses
+  another merchant's branch with `wrong_shop` before the branch code is checked. The merchant page lists its gift cards
+  (view composer from the GiftCard module); a merchant with gift cards can't be deleted. API: `merchant` / `for_merchant`.
+- **Gift Cards ▸ Exchanges** (CRUD pages): list (View only) → exchange page (all details, where used, its claim; **Cancel and
+  refund** box while issued; emailed-code box while pending) → **Exchange for a customer** (`create-giftcardexchange`; customer
+  by email / phone / customer id; same checks as the app; a two-step card still emails the code and staff enter it).
+- **Merchants ▸ Claims** (CRUD, GiftCard module; permissions `merchantclaim` view/create/edit/delete + `settle`): a merchant
+  (or our staff for shops that don't use the site) creates a claim = **all** its used, unclaimed gift cards up to a day
+  (preview first). **Submitted** → edit (re-takes the cards for the new day) / delete (releases them) → our staff **Pay**
+  (date + payment ref) or **Reject** (reason; cards released). `merchant_claims` (CLM-…; the old STL-… settlement became a
+  paid claim) + `gift_card_exchanges.claim_id`. `MerchantClaimService` locks the claim and card rows. Print + CSV (UTF-8 mark).
+  Plain Bootstrap tables with Laravel pagination, not DataTables.
+- **Merchant users** (2026-10-09): `users.merchant_id` (Users form → Merchant; never with the Administrator role) + the
+  **Merchant** role (seeded once by GiftCardDatabaseSeeder: view/edit merchant, create/delete-merchant = branch actions,
+  merchant codes, claims CRUD; no settle). `Modules\Merchant\Http\Middleware\LimitToOwnMerchant` on every merchant and
+  claim route: any `{merchant}`, or model with `merchant_id`, in the URL must be theirs (403), the merchants list redirects
+  to their page, and creating/deleting merchants and paying/rejecting claims are closed. `MerchantRequest` keeps payout rate,
+  status and notes ours. `User::isMerchantUser()`; `MerchantClaim::visibleTo($user)`.
 - `gift_cards`: points_cost, face_value, `min_tier` (TierLevel; "Diamond" = Diamond only, null = everyone), `stock`
   (null = unlimited), `per_customer_limit`, `valid_days`, `requires_verification`, is_active.
   `gift_card_exchanges`: pending / issued / cancelled / failed, code `GC-XXXX-XXXX-XXXX`, snapshots of points and value.
@@ -271,6 +318,27 @@ Packages: `yajra/laravel-datatables-oracle` + `datatables.net-bs4` / `-responsiv
   credits points + optional `spent_amount` tier spending in **one** transaction.
 - `CustomerDirectory::upsert()` is shared with SSO: the partner owns name/email/phone.
 
+## Gateway (`Modules/Api/app/Gateway`)
+
+One signed endpoint for other systems, `POST /api/v1/gateway`, body `{"Request": {timestamp, method, nonce_str,
+sign_type: SHA256, sign, version: 1.0, biz_content: {appid, ...}}}`. Contract and partner code: `docs/gateway-api.md`.
+
+- Callers are **API clients** (`api_clients`: name, `app_id`, secret **encrypted**, is_active, last_used_at), made on
+  Administration → **API Clients**; the secret is shown once (create / rotate).
+- `GatewayKernel` order: envelope rules → client by `biz_content.appid` → rate limit (client + IP) → `Signer` → timestamp
+  (±300 s) → nonce single use (cache) → `GatewayMethods::MAP` → method `rules()` on biz_content → `handle()`.
+  Answers are `{"Response": {result, code, msg, method, biz_content | errors, nonce_str, timestamp, sign}}`, signed
+  with the client's key; the HTTP status matches (400/401/403/404/409/422/429/500); `code` is a stable string.
+- Signature: dot-flatten the envelope (`biz_content.appid`), drop sign/sign_type and empty values, sort, `k=v&…`,
+  `&key=<secret>`, SHA-256 uppercase. biz_content must be flat (strings/ints).
+- Methods (`Gateway/Methods`, one class each, reusing the module services): `pos.customer.register|query`,
+  `pos.tier.query|history`, `pos.point.create|query`, `pos.giftcard.list|exchange|verify|exchanges|use`, `pos.merchant.list`
+  (merchants + branches, no rewards). Customers are named by `external_id`; the client is trusted to act for them.
+  Shop reward redemptions are **not** in the gateway (removed 2026-10-09); the customer token API still has them.
+- New method: class implementing `GatewayMethod` + a line in `GatewayMethods::MAP` + docs. Tests: `CallsGateway` trait.
+  **Read `docs/api-development-guide.md` first** (step-by-step, rules, error mapping, PR checklist).
+- **Not built:** IP allow-list per client (hook marked in `GatewayKernel::handle()`), per-client method permissions.
+
 ## API (`Modules/Api`)
 
 Laravel Sanctum personal access tokens: stored **hashed** in `personal_access_tokens`, so deleting
@@ -293,6 +361,7 @@ a row revokes the token on the next request. This replaces the old JWT + `user_t
 | POST | `/api/v1/customer/gift-cards/{id}/exchange` | customer token | 201 issued (code) or 202 pending (code emailed); 422 + `reason` |
 | POST | `/api/v1/customer/gift-card-exchanges/{id}/verify` | customer token | `code` (6 digits) → issued; 422 + `reason` |
 | GET | `/api/v1/customer/gift-card-exchanges` | customer token | own gift cards (issued / cancelled) |
+| POST | `/api/v1/gateway` | signature (`appid` + secret) | every gateway method, see "Gateway" |
 | POST | `/api/v1/partner/points` | partner key | award points (`customer{}`, `points`, `reference`, `note`, `spent_amount`) → 201 / 200 replay / 409 |
 | GET | `/api/v1/partner/customers/{external_id}/points` | partner key | balance, expiry, months, tier |
 
@@ -300,7 +369,7 @@ Send `Authorization: Bearer <token>`. Errors are always JSON (401 no/expired/rev
 403 missing permission or wrong kind of token, 422 validation, 429 rate limit).
 
 **Rules, and what is deliberately *not* exposed (unlike the old cargo API):**
-- Staff login and customer SSO are the **only** routes without a token (partner routes need the partner key):
+- Staff login and customer SSO are the **only** routes without a token (partner routes need the partner key, the gateway a signature):
   no public signup, lookups or print endpoints. New staff endpoints go in the staff group with a `permission:<action>-<resource>`
   middleware; new customer endpoints in the customer group (`$request->user()` is then a `Customer`).
 - Responses are API Resources with explicit fields, never a raw model. Branch codes and merchant payouts
@@ -352,7 +421,7 @@ renames `user_id` → `customer_id` on the loyalty/redemption tables and refuses
 ## Testing
 
 ```bash
-php artisan test                 # tests/Feature + Modules/*/tests, in-memory SQLite (162 tests)
+php artisan test                 # tests/Feature + Modules/*/tests, in-memory SQLite (204 tests)
 vendor/bin/pint                  # code style
 ```
 

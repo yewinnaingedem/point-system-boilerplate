@@ -34,7 +34,7 @@
                  Each list needs its own id: AdminLTE's treeview binds its click handler to "#id .nav-link", and
                  without an id every list handles every click, toggling a group several times (it never closes). --}}
             @foreach ($menuSections as $section => $items)
-                <ul id="sidebar-section-{{ $loop->index }}" class="nav nav-pills nav-sidebar nav-sidebar-section flex-column" data-widget="treeview" role="menu" data-accordion="false">
+                <ul id="sidebar-section-{{ $loop->index }}" class="nav nav-pills nav-sidebar nav-sidebar-section nav-child-indent flex-column" data-widget="treeview" role="menu" data-accordion="true">
                     @unless ($loop->first && $section === 'Main')
                         <li class="nav-header">{{ mb_strtoupper(__($section)) }}</li>
                     @endunless
@@ -46,7 +46,7 @@
                                     <i class="nav-icon {{ $entry->icon }}"></i>
                                     <p>{{ __($entry->label) }} <i class="right fas fa-angle-left"></i></p>
                                 </a>
-                                <ul class="nav nav-treeview">
+                                <ul class="nav nav-treeview nav-sidebar-children">
                                     @foreach ($entry->children as $item)
                                         @include('partials.sidebar-link', ['item' => $item, 'child' => true])
                                     @endforeach

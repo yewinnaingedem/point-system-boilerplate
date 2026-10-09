@@ -4,8 +4,10 @@ namespace Modules\GiftCard\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Loyalty\Enums\TierLevel;
+use Modules\Merchant\Models\Merchant;
 
 /**
  * A gift card customers can get for points, with optional tier, stock and per-customer limits.
@@ -17,12 +19,13 @@ use Modules\Loyalty\Enums\TierLevel;
  */
 class GiftCard extends Model
 {
-    protected $fillable = ['name', 'description', 'points_cost', 'face_value', 'min_tier', 'stock',
+    protected $fillable = ['merchant_id', 'name', 'description', 'points_cost', 'face_value', 'min_tier', 'stock',
         'per_customer_limit', 'requires_verification', 'valid_days', 'is_active'];
 
     protected function casts(): array
     {
         return [
+            'merchant_id' => 'integer',
             'points_cost' => 'integer',
             'face_value' => 'decimal:2',
             'min_tier' => TierLevel::class,
@@ -32,6 +35,18 @@ class GiftCard extends Model
             'valid_days' => 'integer',
             'is_active' => 'boolean',
         ];
+    }
+
+    /** The shop it belongs to; null = usable at any partner shop. */
+    public function merchant(): BelongsTo
+    {
+        return $this->belongsTo(Merchant::class);
+    }
+
+    /** Can this merchant's branches complete the card? */
+    public function usableAtMerchant(int $merchantId): bool
+    {
+        return $this->merchant_id === null || $this->merchant_id === $merchantId;
     }
 
     public function exchanges(): HasMany

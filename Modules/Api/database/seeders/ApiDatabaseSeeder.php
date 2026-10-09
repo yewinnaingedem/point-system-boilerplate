@@ -9,7 +9,7 @@ class ApiDatabaseSeeder extends ModulePermissionSeeder
     protected function permissions(): array
     {
         return [
-            'apitoken' => ['view', 'delete'],
+            'apiclient' => self::CRUD,
         ];
     }
 }

@@ -71,7 +71,7 @@ class LogViewerServiceProvider extends ModuleServiceProvider
             label: 'Logs',
             route: 'admin.logs.index',
             icon: 'fas fa-clipboard-list',
-            section: 'Administration',
+            section: 'Log Management',
             permission: 'view-logviewer',
             order: 95,
         ));

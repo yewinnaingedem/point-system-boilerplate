@@ -77,9 +77,9 @@ class AppSettingServiceProvider extends ModuleServiceProvider
             label: 'Settings',
             route: 'admin.settings.edit',
             icon: 'fas fa-cogs',
-            section: 'Administration',
+            section: 'Main',            // top block, right under Dashboard (above Access Management)
             permission: 'view-appsetting',
-            order: 90,
+            order: 10,
         ));
     }
 

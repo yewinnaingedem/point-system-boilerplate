@@ -11,9 +11,12 @@ use Modules\GiftCard\Enums\ExchangeStatus;
 use Modules\GiftCard\Models\GiftCard;
 use Modules\GiftCard\Models\GiftCardExchange;
 use Modules\GiftCard\Notifications\GiftCardVerificationCode;
+use Modules\GiftCard\Services\GiftCardExchangeService;
 use Modules\Loyalty\Enums\PointTransactionType;
 use Modules\Loyalty\Services\PointWallet;
 use Modules\Loyalty\Services\TierQualificationEngine;
+use Modules\Merchant\Models\Merchant;
+use Modules\Merchant\Services\MerchantService;
 use Tests\TestCase;
 
 class GiftCardExchangeTest extends TestCase
@@ -151,6 +154,44 @@ class GiftCardExchangeTest extends TestCase
         $this->get(route('admin.gift-cards.index'))->assertForbidden();
         $this->get(route('admin.gift-card-exchanges.index'))->assertForbidden();
         $this->post(route('admin.gift-cards.store'), ['name' => 'x'])->assertForbidden();
+    }
+
+    public function test_staff_cannot_cancel_a_used_gift_card_and_see_where_it_was_used(): void
+    {
+        $card = $this->card();
+        $id = $this->exchange($card)->assertCreated()->json('data.id');
+        $kfc = Merchant::query()->create(['name' => 'KFC', 'settlement_rate' => 10]);
+        $branch = app(MerchantService::class)->createBranch($kfc, ['name' => 'Junction Square', 'is_active' => true]);
+        app(GiftCardExchangeService::class)->useAtBranch($this->customer, GiftCardExchange::query()->find($id), $branch->id, $branch->code);
+
+        $admin = $this->userWithRole(SystemRole::Administrator);
+        $this->actingAs($admin)->post(route('admin.gift-card-exchanges.cancel', $id), ['reason' => 'test'])->assertRedirect();
+        $this->assertSame(ExchangeStatus::Used, GiftCardExchange::query()->find($id)->status);
+        $this->assertSame(4000, $this->wallet->balance($this->customer->id));
+
+        $rows = $this->dataTableText($this->dataTable(route('admin.gift-card-exchanges.data'), ['date', 'customer', 'card', 'points', 'code', 'expires', 'status', 'actions']));
+        $this->assertStringContainsString('KFC Junction Square', $rows);
+    }
+
+    public function test_a_gift_card_can_belong_to_a_merchant_and_shows_on_its_page(): void
+    {
+        $kfc = Merchant::query()->create(['name' => 'KFC', 'settlement_rate' => 10]);
+        $admin = $this->userWithRole(SystemRole::Administrator);
+        $this->actingAs($admin);
+
+        $this->get(route('admin.gift-cards.create', ['merchant_id' => $kfc->id]))->assertOk()->assertSee('Any partner shop');
+        $this->post(route('admin.gift-cards.store'), ['merchant_id' => $kfc->id, 'name' => 'KFC voucher', 'points_cost' => 100, 'face_value' => 5000, 'is_active' => '1'])
+            ->assertRedirect();
+        $card = GiftCard::query()->where('name', 'KFC voucher')->sole();
+        $this->assertSame($kfc->id, $card->merchant_id);
+
+        $this->get(route('admin.merchants.show', $kfc))->assertOk()->assertSee('KFC voucher')->assertSee('New gift card');
+        $this->dataTable(route('admin.gift-cards.data'), ['id', 'card', 'points', 'value', 'tier', 'stock_left', 'limits', 'status', 'actions'])
+            ->assertJsonFragment(['id' => $card->id]);
+
+        // The merchant can't be deleted while it has gift cards.
+        $this->delete(route('admin.merchants.destroy', $kfc))->assertSessionHas('error');
+        $this->assertModelExists($kfc);
     }
 
     private function card(array $attributes = []): GiftCard

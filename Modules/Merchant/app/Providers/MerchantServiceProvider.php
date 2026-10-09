@@ -6,6 +6,7 @@ use App\Support\Menu\MenuGroup;
 use App\Support\Menu\MenuItem;
 use App\Support\Menu\MenuRegistry;
 use Modules\Merchant\Console\DemoDataCommand;
+use Modules\Merchant\Models\Merchant;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 
 class MerchantServiceProvider extends ModuleServiceProvider
@@ -43,9 +44,13 @@ class MerchantServiceProvider extends ModuleServiceProvider
     {
         parent::boot();
 
+        // The Users form shows a "Merchant" select for a merchant's own staff.
+        $this->app['view']->composer('access::users.form', fn ($view) => $view->with(
+            'merchants', Merchant::query()->orderBy('name')->pluck('name', 'id')
+        ));
+
         $this->app->make(MenuRegistry::class)
-            ->addGroup(new MenuGroup('merchants', 'Merchants', 'fas fa-store', 'Sales', 60))
-            ->add(new MenuItem('Merchants', 'admin.merchants.index', 'fas fa-store-alt', 'Sales', 'view-merchant', 10, 'admin.merchants.*', 'merchants'))
-            ->add(new MenuItem('Redemptions', 'admin.redemptions.index', 'fas fa-gift', 'Sales', 'view-redemption', 20, 'admin.redemptions.*', 'merchants'));
+            ->addGroup(new MenuGroup('merchants', 'Merchants', 'fas fa-store', 'Management', 60))
+            ->add(new MenuItem('Merchants', 'admin.merchants.index', 'fas fa-store-alt', 'Management', 'view-merchant', 10, 'admin.merchants.*', 'merchants'));
     }
 }

@@ -32,8 +32,11 @@ class MerchantService
     public function deleteMerchant(Merchant $merchant): void
     {
         $this->db->transaction(function () use ($merchant) {
-            if ($merchant->redemptions()->exists()) {
-                throw new MerchantInUse(__(':name has redemptions, so it can only be deactivated.', ['name' => $merchant->name]));
+            if ($merchant->redemptions()->exists() || $this->db->table('gift_card_exchanges')->where('merchant_id', $merchant->id)->exists()) {
+                throw new MerchantInUse(__(':name has redemptions or used gift cards, so it can only be deactivated.', ['name' => $merchant->name]));
+            }
+            if ($this->db->table('gift_cards')->where('merchant_id', $merchant->id)->exists()) {
+                throw new MerchantInUse(__(':name has gift cards. Move them to another shop or delete them first.', ['name' => $merchant->name]));
             }
             $merchant->delete(); // branches and rewards go with it (cascade)
         });
@@ -72,8 +75,8 @@ class MerchantService
     /** @throws MerchantInUse */
     public function deleteBranch(MerchantBranch $branch): void
     {
-        if ($branch->redemptions()->exists()) {
-            throw new MerchantInUse(__(':name has redemptions, so it can only be deactivated.', ['name' => $branch->name]));
+        if ($branch->redemptions()->exists() || $this->db->table('gift_card_exchanges')->where('branch_id', $branch->id)->exists()) {
+            throw new MerchantInUse(__(':name has redemptions or used gift cards, so it can only be deactivated.', ['name' => $branch->name]));
         }
         $branch->delete();
     }

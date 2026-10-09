@@ -3,7 +3,6 @@
 namespace Modules\Merchant\Services;
 
 use App\Models\User;
-use Illuminate\Cache\RateLimiter;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Str;
@@ -14,7 +13,6 @@ use Modules\Loyalty\Models\PointTransaction;
 use Modules\Loyalty\Services\PointWallet;
 use Modules\Merchant\Enums\RedemptionStatus;
 use Modules\Merchant\Exceptions\RedemptionRejected;
-use Modules\Merchant\Models\MerchantBranch;
 use Modules\Merchant\Models\MerchantReward;
 use Modules\Merchant\Models\Redemption;
 
@@ -31,7 +29,7 @@ class RedemptionService
     public function __construct(
         private readonly ConnectionInterface $db,
         private readonly PointWallet $wallet,
-        private readonly RateLimiter $limiter,
+        private readonly BranchCodeVerifier $codes,
     ) {}
 
     /**
@@ -46,17 +44,14 @@ class RedemptionService
             return $existing;
         }
 
-        $branch = MerchantBranch::query()->with('merchant')->find($branchId);
-        if (! $branch?->is_active || ! $branch->merchant->is_active) {
-            throw RedemptionRejected::unavailable('branch_id', __('This shop is not taking redemptions.'));
-        }
+        $branch = $this->codes->availableBranch($branchId);
 
         $reward = MerchantReward::query()->whereKey($rewardId)->where('merchant_id', $branch->merchant_id)->first();
         if (! $reward?->is_active) {
             throw RedemptionRejected::unavailable('reward_id', __('This reward is not available at this shop.'));
         }
 
-        $this->verifyCode($customer, $branch, $code);
+        $this->codes->verify($customer, $branch, $code);
 
         try {
             return $this->db->transaction(function () use ($customer, $branch, $reward, $requestId) {
@@ -122,26 +117,6 @@ class RedemptionService
 
             return $locked;
         });
-    }
-
-    /** Wrong codes count per customer per branch; after too many the customer waits. */
-    private function verifyCode(Customer $customer, MerchantBranch $branch, string $code): void
-    {
-        $key = "merchant-code:{$branch->id}:{$customer->id}";
-        $maxAttempts = config('merchant.code_max_attempts');
-
-        if ($this->limiter->tooManyAttempts($key, $maxAttempts)) {
-            throw RedemptionRejected::lockedOut($this->limiter->availableIn($key));
-        }
-
-        if (! $branch->codeMatches($code)) {
-            $this->limiter->hit($key, config('merchant.code_lockout_minutes') * 60);
-            $left = $maxAttempts - $this->limiter->attempts($key);
-
-            throw $left > 0 ? RedemptionRejected::wrongCode($left) : RedemptionRejected::lockedOut($this->limiter->availableIn($key));
-        }
-
-        $this->limiter->clear($key);
     }
 
     private function findByRequest(Customer $customer, string $requestId): ?Redemption

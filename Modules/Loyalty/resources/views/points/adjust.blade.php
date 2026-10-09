@@ -5,10 +5,9 @@
                 @csrf
                 <div class="card-body">
                     <div class="form-group">
-                        <label for="customer">{{ __('Customer (email or phone)') }}</label>
-                        <input id="customer" name="customer" value="{{ old('customer', request('customer')) }}" required autofocus
-                               @class(['form-control', 'is-invalid' => $errors->has('customer')])>
-                        @error('customer') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                        <label for="customer_id">{{ __('Customer') }}</label>
+                        @include('customer::partials.select', ['name' => 'customer_id', 'selected' => $customer])
+                        <small class="form-text text-muted">{{ __('Type part of the name, email, phone or customer id, then pick the customer. Their tier and current points are shown.') }}</small>
                     </div>
                     <div class="form-group">
                         <label for="points">{{ __('Points') }}</label>

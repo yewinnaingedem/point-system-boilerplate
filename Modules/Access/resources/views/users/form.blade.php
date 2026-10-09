@@ -38,6 +38,22 @@
                                     @error('phone') <span class="invalid-feedback">{{ $message }}</span> @enderror
                                 </div>
                             </div>
+                            @isset($merchants)
+                                <div class="form-group col-md-6">
+                                    <label for="merchant_id">{{ __('Merchant') }}</label>
+                                    <div class="input-group">
+                                        <div class="input-group-prepend"><span class="input-group-text"><i class="fas fa-store"></i></span></div>
+                                        <select id="merchant_id" name="merchant_id" @class(['custom-select', 'is-invalid' => $errors->has('merchant_id')])>
+                                            <option value="">{{ __('None (our staff)') }}</option>
+                                            @foreach ($merchants as $id => $merchantName)
+                                                <option value="{{ $id }}" @selected((string) old('merchant_id', $user->merchant_id) === (string) $id)>{{ $merchantName }}</option>
+                                            @endforeach
+                                        </select>
+                                        @error('merchant_id') <span class="invalid-feedback">{{ $message }}</span> @enderror
+                                    </div>
+                                    <small class="form-text text-muted">{{ __('A merchant\'s own staff (e.g. KFC manager) see only that merchant. Give them the Merchant role.') }}</small>
+                                </div>
+                            @endisset
                             <div class="form-group col-md-6">
                                 <label for="avatar">{{ __('Photo') }}</label>
                                 <div class="custom-file">

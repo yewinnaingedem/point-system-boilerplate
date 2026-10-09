@@ -2,6 +2,7 @@
 
 namespace Modules\Access\Http\Requests;
 
+use App\Enums\SystemRole;
 use App\Models\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -39,12 +40,25 @@ class UserRequest extends FormRequest
             'avatar' => ['nullable', 'image', 'max:2048'],
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['string', Rule::in($assignable)],
+            // A merchant's own staff; never an administrator (they would see everything anyway).
+            'merchant_id' => ['nullable', 'integer', Rule::exists('merchants', 'id'), 'prohibited_if_accepted:is_administrator'],
         ];
     }
 
     protected function prepareForValidation(): void
     {
-        $this->merge(['is_active' => $this->boolean('is_active')]);
+        $this->merge([
+            'is_active' => $this->boolean('is_active'),
+            'is_administrator' => in_array(SystemRole::Administrator->value, (array) $this->input('roles', []), true),
+        ]);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return ['merchant_id.prohibited_if_accepted' => __('An administrator can\'t belong to a merchant.')];
     }
 
     private function editedUser(): ?User

@@ -25,9 +25,7 @@
                 ['data' => 'id', 'name' => 'id', 'title' => '#', 'orderable' => true, 'class' => 'text-muted', 'priority' => 5],
                 ['data' => 'merchant', 'name' => 'name', 'title' => __('Merchant'), 'orderable' => true, 'priority' => 1],
                 ['data' => 'branches', 'name' => 'branches_count', 'title' => __('Branches'), 'orderable' => true, 'class' => 'text-right'],
-                ['data' => 'rewards', 'title' => __('Rewards'), 'class' => 'text-right'],
                 ['data' => 'rate', 'title' => __('Payout / point'), 'class' => 'text-right'],
-                ['data' => 'unsettled', 'name' => 'unsettled_total', 'title' => __('Owed (unsettled)'), 'orderable' => true, 'class' => 'text-right', 'priority' => 3],
                 ['data' => 'status', 'title' => __('Status'), 'priority' => 4],
                 ['data' => 'actions', 'title' => __('Actions'), 'class' => 'text-right', 'priority' => 2],
             ]" />
